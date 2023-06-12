@@ -33,11 +33,11 @@ import compiler.lib.ir_framework.*;
  * @run driver compiler.c2.irTests.scalarReplacement.AllocationMergesTests
  */
 public class AllocationMergesTests {
+    private int invocations = 0;
     private static Point global_escape = new Point(2022, 2023);
 
     public static void main(String[] args) {
         TestFramework.runWithFlags("-XX:+ReduceAllocationMerges",
-                                   "-XX:+IgnoreUnrecognizedVMOptions",
                                    "-XX:+TraceReduceAllocationMerges",
                                    "-XX:CompileCommand=exclude,*::dummy*");
     }
@@ -127,8 +127,7 @@ public class AllocationMergesTests {
 
     @Test
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH })
-    @IR(counts = { IRNode.ALLOC, "2" })
-    // Merge won't be reduced because the inputs to the Phi have different Klasses
+    @IR(failOn = { IRNode.ALLOC })
     int testPollutedPolymorphic(boolean cond, int l) {
         Shape obj1 = new Square(l);
         Shape obj2 = new Circle(l);
@@ -207,8 +206,7 @@ public class AllocationMergesTests {
 
     @Test
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH })
-    @IR(counts = { IRNode.ALLOC, "1" })
-    // The merge won't be simplified because the merge with NULL
+    @IR(failOn = { IRNode.ALLOC })
     int testCondAfterMergeWithNull(boolean cond1, boolean cond2, int x, int y) {
         Point p = null;
 
@@ -282,8 +280,7 @@ public class AllocationMergesTests {
 
     @Test
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH })
-    @IR(counts = { IRNode.ALLOC, "1" })
-    // Merge won't be reduced because, among other things, one of the inputs is null.
+    @IR(failOn = { IRNode.ALLOC })
     int testCmpMergeWithNull_Second(boolean cond, int x, int y) {
         Point p = null;
 
@@ -302,8 +299,7 @@ public class AllocationMergesTests {
 
     @Test
     @Arguments({ Argument.RANDOM_EACH, Argument.NUMBER_42, Argument.RANDOM_EACH })
-    @IR(counts = { IRNode.ALLOC, "1" })
-    // The allocation won't be removed because the merge doesn't have exact type
+    @IR(failOn = { IRNode.ALLOC })
     int testObjectIdentity(boolean cond, int x, int y) {
         Point o = new Point(x, y);
 
@@ -341,7 +337,7 @@ public class AllocationMergesTests {
 
     @Test
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH })
-    @IR(counts = { IRNode.ALLOC, "2" })
+    @IR(failOn = { IRNode.ALLOC })
     int testCmpMergeWithNull(boolean cond, int x, int y) {
         Point p = null;
 
@@ -360,9 +356,7 @@ public class AllocationMergesTests {
 
     @Test
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH })
-    @IR(counts = { IRNode.ALLOC, "2" })
-    // The unused allocation will be removed.
-    // The other two allocations assigned to 's' won't be removed because they have different type.
+    @IR(failOn = { IRNode.ALLOC })
     int testSubclasses(boolean c1, boolean c2, int x, int y, int w, int z) {
         new A();
         Root s = new Home(x, y);
@@ -784,6 +778,72 @@ public class AllocationMergesTests {
         return val + p1.x + p2.y;
     }
 
+    @Test
+    @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH })
+    @IR(counts = { IRNode.ALLOC, "2" }, phase = CompilePhase.PHASEIDEAL_BEFORE_EA)
+    @IR(counts = { IRNode.ALLOC, "1" }, phase = CompilePhase.ITER_GVN_AFTER_ELIMINATION)
+    int testSRAndNSR_NoTrap(boolean cond1, int x, int y) {
+        Point p = new Point(x, y);
+
+        if (cond1) {
+            p = new Point(x+1, y+1);
+            global_escape = p;
+        }
+
+        return p.y;
+    }
+
+    @Test
+    @Warmup(2000)
+    @Arguments({ Argument.RANDOM_EACH, Argument.FALSE, Argument.RANDOM_EACH, Argument.RANDOM_EACH })
+    @IR(counts = { IRNode.ALLOC, "2" }, phase = CompilePhase.PHASEIDEAL_BEFORE_EA)
+    @IR(counts = { IRNode.ALLOC, "1" }, phase = CompilePhase.ITER_GVN_AFTER_ELIMINATION)
+    int testSRAndNSR_Trap(boolean cond1, boolean cond2, int x, int y) {
+        invocations++;
+        Point p = new Point(x, y);
+
+        if (cond1) {
+            p = new Point(x+1, y+1);
+            global_escape = p;
+        }
+
+        if (invocations == 2001) {
+            // This will show up to C2 as a trap.
+            new ADefaults();
+        }
+
+        return p.y;
+    }
+
+    @Test
+    @Arguments({ Argument.RANDOM_EACH })
+    @IR(counts = { IRNode.ALLOC, "2" }, phase = CompilePhase.PHASEIDEAL_BEFORE_EA)
+    @IR(counts = { IRNode.ALLOC, "0" }, phase = CompilePhase.ITER_GVN_AFTER_ELIMINATION)
+    char testString_one(boolean cond1) {
+        String p = new String("Java");
+
+        if (cond1) {
+            p = new String("HotSpot");
+        }
+
+        return p.charAt(0);
+    }
+
+    @Test
+    @Arguments({ Argument.RANDOM_EACH })
+    @IR(counts = { IRNode.ALLOC, "1" }, phase = CompilePhase.PHASEIDEAL_BEFORE_EA)
+    @IR(counts = { IRNode.ALLOC, "0" }, phase = CompilePhase.ITER_GVN_AFTER_ELIMINATION)
+    char testString_two(boolean cond1) {
+        String p = new String("HotSpot");
+
+        if (cond1) {
+            p = dummy("String");
+            if (p == null) return 'J';
+        }
+
+        return p.charAt(0);
+    }
+
     // ------------------ Utility for Testing ------------------- //
 
     @DontCompile
@@ -803,6 +863,11 @@ public class AllocationMergesTests {
     @DontCompile
     static Point dummy(int x, int y) {
         return new Point(x, y);
+    }
+
+    @DontCompile
+    static String dummy(String str) {
+        return str;
     }
 
     @DontCompile
@@ -840,7 +905,7 @@ public class AllocationMergesTests {
         }
     }
 
-   static class ADefaults {
+    static class ADefaults {
         static int ble;
         int i;
         @DontCompile

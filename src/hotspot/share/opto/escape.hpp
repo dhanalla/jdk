@@ -530,6 +530,30 @@ private:
     return is_new;
   }
 
+  bool has_reducible_merge_base(Node* n, Unique_Node_List &reducible_merges) {
+    PointsToNode* ptn = ptnode_adr(n->_idx);
+    if (ptn == nullptr || !ptn->is_Field() || ptn->as_Field()->base_count() < 2) {
+      return false;
+    }
+
+    for (BaseIterator i(ptn->as_Field()); i.has_next(); i.next()) {
+      Node* base = i.get()->ideal_node();
+
+      if (reducible_merges.member(base)) {
+        return true;
+      }
+
+      if (base->is_CastPP() || base->is_CheckCastPP()) {
+        base = base->in(1);
+        if (reducible_merges.member(base)) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
   // Helper functions
   bool   is_oop_field(Node* n, int offset, bool* unsafe);
   static Node* find_second_addp(Node* addp, Node* n);
@@ -545,7 +569,7 @@ private:
                           Unique_Node_List &reducible_merges);
 
   // Helper methods for unique types split.
-  bool split_AddP(Node *addp, Node *base);
+  bool split_AddP(Node *addp, Node *base, int new_index_start);
 
   PhiNode *create_split_phi(PhiNode *orig_phi, int alias_idx, GrowableArray<PhiNode *>  &orig_phi_worklist, bool &new_created);
   PhiNode *split_memory_phi(PhiNode *orig_phi, int alias_idx, GrowableArray<PhiNode *>  &orig_phi_worklist);
@@ -590,13 +614,27 @@ private:
   // -------------------------------------------
   // Methods related to Reduce Allocation Merges
 
-  bool can_reduce_phi(PhiNode* ophi) const;
-  bool can_reduce_phi_check_users(PhiNode* ophi) const;
-  bool can_reduce_phi_check_inputs(PhiNode* ophi) const;
+  bool can_reduce(PhiNode* ophi) const;
+  bool can_reduce_check_users(PhiNode* ophi) const;
+  bool can_reduce_check_inputs(PhiNode* ophi) const;
 
-  void reduce_phi_on_field_access(PhiNode* ophi, GrowableArray<Node *>  &alloc_worklist);
-  void reduce_phi_on_safepoints(PhiNode* ophi, Unique_Node_List* safepoints);
-  void reduce_phi(PhiNode* ophi);
+  void if_on_selector(Node* current_control, Node* selector, Node** yes_sr_control, Node** not_sr_control, Node** selector_if_region);
+  bool only_loads_as_users(Node* use) const;
+  BoolTest::mask compare(JavaObjectNode* sr_jobj, Node* other) const;
+  void collect_loads(Node* base, Unique_Node_List& loads);
+  void reset_merge_entries(PhiNode* ophi);
+  PhiNode* create_selector(PhiNode* ophi) const;
+  void update_after_load_split(PhiNode* data_phi, AddPNode* previous_addp, LoadNode* previous_load,
+                               GrowableArray<Node *>  &alloc_worklist,
+                               GrowableArray<Node *>  &memnode_worklist);
+  Node* partial_load_split(Node* load, Node* ophi, Node* cast, Node* selector);
+
+  bool reduce_on_sfpt(Node* ophi, Node* cast, Node* selector, Unique_Node_List& safepoints);
+  void reduce_on_cast(PhiNode* ophi, Node* selector, Node* castpp, GrowableArray<Node *>  &alloc_worklist, GrowableArray<Node *>  &memnode_worklist);
+  void reduce_on_cmp(PhiNode* ophi, Node* selector, Node* cmp, int new_index_start);
+  void reduce_on_field_access(PhiNode* ophi, Unique_Node_List& loads, GrowableArray<Node *>  &alloc_worklist, GrowableArray<Node *>  &memnode_worklist);
+  bool reduce_on_safepoints(PhiNode* ophi);
+  void reduce_merge(PhiNode* ophi, GrowableArray<Node *>  &alloc_worklist, GrowableArray<Node *>  &memnode_worklist, int new_index_start);
 
   void set_not_scalar_replaceable(PointsToNode* ptn NOT_PRODUCT(COMMA const char* reason)) const {
 #ifndef PRODUCT

@@ -227,7 +227,7 @@ Node *MemNode::optimize_memory_chain(Node *mchain, const TypePtr *t_adr, Node *l
         t->is_oopptr()->cast_to_exactness(true)
         ->is_oopptr()->cast_to_ptr_type(t_oop->ptr())
         ->is_oopptr()->cast_to_instance_id(t_oop->instance_id());
-      if (t_oop->is_aryptr()) {
+      if (t_oop->isa_aryptr()) {
         mem_t = mem_t->is_aryptr()
                      ->cast_to_stable(t_oop->is_aryptr()->is_stable())
                      ->cast_to_size(t_oop->is_aryptr()->size())
@@ -1523,13 +1523,20 @@ static bool stable_phi(PhiNode* phi, PhaseGVN *phase) {
 // Phi *base*. This method is essentially a copy of the validations performed
 // by 'split_through_phi'. The first use of this method was in EA code as part
 // of simplification of allocation merges.
+// Some differences from original method:
+//  - this method does not check for the presence of a Phi in the memory input.
+//  - If base->is_CastPP(): base = base->in(1)
 bool LoadNode::can_split_through_phi_base(PhaseGVN* phase) {
   Node* mem        = in(Memory);
   Node* address    = in(Address);
   intptr_t ignore  = 0;
   Node*    base    = AddPNode::Ideal_base_and_offset(address, phase, ignore);
+           base    = (base->is_CastPP() || base->is_CheckCastPP()) ? base->in(1) : base;
   bool base_is_phi = (base != nullptr) && base->is_Phi();
 
+  // LoadVector subclasses such as LoadVectorMasked have extra inputs that the
+  // split logic doesn't take into account. Naturally, we also don't split
+  // through the base if the base is not a Phi node.
   if (req() > 3 || !base_is_phi) {
     return false;
   }
@@ -1662,7 +1669,7 @@ Node* LoadNode::split_through_phi(PhaseGVN* phase, bool ignore_missing_instance_
     int this_iid = t_oop->is_known_instance_field() ? t_oop->instance_id() : base->_idx;
     phi = new PhiNode(region, this_type, nullptr, mem->_idx, this_iid, this_index, this_offset);
   } else if (ignore_missing_instance_id) {
-    phi = new PhiNode(region, this_type, nullptr, mem->_idx);
+    phi = new PhiNode(region, this_type);
   } else {
     return nullptr;
   }

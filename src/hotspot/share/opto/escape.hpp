@@ -569,7 +569,7 @@ private:
                           Unique_Node_List &reducible_merges);
 
   // Helper methods for unique types split.
-  bool split_AddP(Node *addp, Node *base, int new_index_start);
+  bool split_AddP(Node *addp, Node *base);
 
   PhiNode *create_split_phi(PhiNode *orig_phi, int alias_idx, GrowableArray<PhiNode *>  &orig_phi_worklist, bool &new_created);
   PhiNode *split_memory_phi(PhiNode *orig_phi, int alias_idx, GrowableArray<PhiNode *>  &orig_phi_worklist);
@@ -615,12 +615,11 @@ private:
   // Methods related to Reduce Allocation Merges
 
   bool can_reduce(PhiNode* ophi) const;
-  bool can_reduce_check_users(PhiNode* ophi) const;
+  bool can_reduce_check_users(Node* base, int nesting_level = 0) const;
   bool can_reduce_check_inputs(PhiNode* ophi) const;
 
   void if_on_selector(Node* current_control, Node* selector, Node** yes_sr_control, Node** not_sr_control, Node** selector_if_region);
-  bool only_loads_as_users(Node* use) const;
-  BoolTest::mask compare(JavaObjectNode* sr_jobj, Node* other) const;
+  BoolTest::mask static_cmpp_result(JavaObjectNode* sr_jobj, Node* other) const;
   void collect_loads(Node* base, Unique_Node_List& loads);
   void reset_merge_entries(PhiNode* ophi);
   PhiNode* create_selector(PhiNode* ophi) const;
@@ -631,10 +630,10 @@ private:
 
   bool reduce_on_sfpt(Node* ophi, Node* cast, Node* selector, Unique_Node_List& safepoints);
   void reduce_on_cast(PhiNode* ophi, Node* selector, Node* castpp, GrowableArray<Node *>  &alloc_worklist, GrowableArray<Node *>  &memnode_worklist);
-  void reduce_on_cmp(PhiNode* ophi, Node* selector, Node* cmp, int new_index_start);
-  void reduce_on_field_access(PhiNode* ophi, Unique_Node_List& loads, GrowableArray<Node *>  &alloc_worklist, GrowableArray<Node *>  &memnode_worklist);
+  void reduce_on_cmp(PhiNode* ophi, Node* selector, Node* cmp);
+  void reduce_on_field_access(PhiNode* ophi, GrowableArray<Node *>  &alloc_worklist, GrowableArray<Node *>  &memnode_worklist);
   bool reduce_on_safepoints(PhiNode* ophi);
-  void reduce_merge(PhiNode* ophi, GrowableArray<Node *>  &alloc_worklist, GrowableArray<Node *>  &memnode_worklist, int new_index_start);
+  void reduce_merge(PhiNode* ophi, GrowableArray<Node *>  &alloc_worklist, GrowableArray<Node *>  &memnode_worklist);
 
   void set_not_scalar_replaceable(PointsToNode* ptn NOT_PRODUCT(COMMA const char* reason)) const {
 #ifndef PRODUCT

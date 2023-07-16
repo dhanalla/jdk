@@ -45,28 +45,6 @@
 // To avoid float value underflow
 #define MIN_BLOCK_FREQUENCY 1.e-35f
 
-#ifndef PRODUCT
-static void save_graph(Node* root, const char* filepath) {
-  Unique_Node_List ideal_nodes;
-  fileStream fstream(filepath);
-
-  ideal_nodes.push(root);
-  for( uint next = 0; next < ideal_nodes.size(); ++next ) {
-    Node* n = ideal_nodes.at(next);
-
-    n->dump(nullptr, false, &fstream);
-    fstream.cr();
-
-    for (uint i=0; i<n->outcnt(); i++) {
-      Node* m = n->raw_out(i);
-      ideal_nodes.push(m);
-    }
-  }
-
-  fstream.flush();
-}
-#endif
-
 //----------------------------schedule_node_into_block-------------------------
 // Insert node n into block b. Look for projections of n and make sure they
 // are in b also.
@@ -292,19 +270,7 @@ static void assert_dom(Block* b1, Block* b2, Node* n, const PhaseCFG* cfg) {
       tty->print("B%d idom=B%d depth=%2d ",inb->_pre_order,
                  inb->_idom ? inb->_idom->_pre_order : 0, inb->_dom_depth);
       inn->dump();
-
-      tty->print("  Idoms: ");
-      tmp = inb;
-      while (tmp != nullptr) {
-        tty->print("B%d <- ", tmp->_pre_order);
-        tmp = tmp->_idom;
-      }
-      tty->cr();
     }
-    save_graph(cfg->C->root(), "/tmp/gcm_assert_dom.err");
-    tty->print("Block1: %d", b1->_pre_order); tty->cr();
-    tty->print("Block2: %d", b2->_pre_order); tty->cr();
-    tty->print("Method: %s::%s", cfg->C->method()->holder()->name()->as_utf8(), cfg->C->method()->name()->as_utf8()); tty->cr();
     tty->print("Failing node: ");
     n->dump();
     assert(false, "unscheduable graph");
@@ -1343,13 +1309,8 @@ void PhaseCFG::schedule_late(VectorSet &visited, Node_Stack &stack) {
     // earliest possible placement. This guarantees that
     // hoist_to_cheaper_block() will always have at least one valid choice.
     if (self->is_memory_writer()) {
-      if ( ! (find_block_for_node(self->in(0)) == early) ) {
-        tty->print("Method: %s::%s", C->method()->holder()->name()->as_utf8(), C->method()->name()->as_utf8()); tty->cr();
-        tty->print_cr("Failing node: "); self->dump(1); tty->cr();
-        save_graph(C->root(), "/tmp/failed_graph.ir");
-        assert(find_block_for_node(self->in(0)) == early,
-              "The home of a memory writer must also be its earliest placement");
-      }
+      assert(find_block_for_node(self->in(0)) == early,
+            "The home of a memory writer must also be its earliest placement");
     }
 #endif
 

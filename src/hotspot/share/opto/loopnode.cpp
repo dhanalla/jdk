@@ -6011,27 +6011,6 @@ void PhaseIdealLoop::verify_strip_mined_scheduling(Node *n, Node* least) {
 #endif
 }
 
-#ifndef PRODUCT
-static void save_graph(Node* root, const char* filepath) {
-  Unique_Node_List ideal_nodes;
-  fileStream fstream(filepath);
-
-  ideal_nodes.push(root);
-  for( uint next = 0; next < ideal_nodes.size(); ++next ) {
-    Node* n = ideal_nodes.at(next);
-
-    n->dump(nullptr, false, &fstream);
-    fstream.cr();
-
-    for (uint i=0; i<n->outcnt(); i++) {
-      Node* m = n->raw_out(i);
-      ideal_nodes.push(m);
-    }
-  }
-
-  fstream.flush();
-}
-#endif
 
 //------------------------------build_loop_late_post---------------------------
 // Put Data nodes into some loop nest, by setting the _loop_or_ctrl[]->loop mapping.
@@ -6133,10 +6112,6 @@ void PhaseIdealLoop::build_loop_late_post_work(Node *n, bool pinned) {
 #ifdef ASSERT
     if (legal->is_Start() && !early->is_Root()) {
       // Bad graph. Print idom path and fail.
-      tty->print_cr("bad graph. bad graph. Method and holder -> %s::%s", C->method()->holder()->name()->as_utf8(), C->method()->name()->as_utf8());
-      stringStream ss;
-      ss.print("/tmp/error_%s.txt", C->method()->name()->as_utf8());
-      save_graph(C->root(), ss.as_string());
       dump_bad_graph("Bad graph detected in build_loop_late", n, early, LCA);
       assert(false, "Bad graph detected in build_loop_late");
     }

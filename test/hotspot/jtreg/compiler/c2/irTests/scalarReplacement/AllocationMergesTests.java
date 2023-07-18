@@ -1,5 +1,9 @@
 /*
+<<<<<<< HEAD
  * Copyright (c) 2022, Oracle and/or its affiliates. All rights reserved.
+=======
+ * Copyright (c) 2023, Oracle and/or its affiliates. All rights reserved.
+>>>>>>> origin/master
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,6 +26,11 @@
  */
 package compiler.c2.irTests.scalarReplacement;
 
+<<<<<<< HEAD
+=======
+import java.util.Random;
+import jdk.test.lib.Asserts;
+>>>>>>> origin/master
 import compiler.lib.ir_framework.*;
 
 /*
@@ -29,7 +38,11 @@ import compiler.lib.ir_framework.*;
  * @bug 8281429
  * @summary Tests that C2 can correctly scalar replace some object allocation merges.
  * @library /test/lib /
+<<<<<<< HEAD
  * @requires vm.bits == 64 & vm.compiler2.enabled & vm.opt.final.UseCompressedOops & vm.opt.final.EliminateAllocations
+=======
+ * @requires vm.debug == true & vm.bits == 64 & vm.compiler2.enabled & vm.opt.final.UseCompressedOops & vm.opt.final.EliminateAllocations
+>>>>>>> origin/master
  * @run driver compiler.c2.irTests.scalarReplacement.AllocationMergesTests
  */
 public class AllocationMergesTests {
@@ -37,16 +50,139 @@ public class AllocationMergesTests {
     private static Point global_escape = new Point(2022, 2023);
 
     public static void main(String[] args) {
+<<<<<<< HEAD
         TestFramework.runWithFlags("-XX:+ReduceAllocationMerges",
                                    "-XX:+TraceReduceAllocationMerges",
+=======
+        TestFramework.runWithFlags("-XX:+UnlockDiagnosticVMOptions",
+                                   "-XX:+ReduceAllocationMerges",
+                                   "-XX:+TraceReduceAllocationMerges",
+                                   "-XX:+DeoptimizeALot",
+>>>>>>> origin/master
                                    "-XX:CompileCommand=exclude,*::dummy*");
     }
 
     // ------------------ No Scalar Replacement Should Happen in The Tests Below ------------------- //
 
+<<<<<<< HEAD
     @Test
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH })
     @IR(counts = { IRNode.ALLOC, "1" })
+=======
+    @Run(test = {"testGlobalEscape_C2",
+                 "testArgEscape_C2",
+                 "testEscapeInCallAfterMerge_C2",
+                 "testNoEscapeWithWriteInLoop_C2",
+                 "testPollutedWithWrite_C2",
+                 "testPollutedPolymorphic_C2",
+                 "testMergedLoadAfterDirectStore_C2",
+                 "testMergedAccessAfterCallWithWrite_C2",
+                 "testLoadAfterTrap_C2",
+                 "testCondAfterMergeWithNull_C2",
+                 "testLoadAfterLoopAlias_C2",
+                 "testCallTwoSide_C2",
+                 "testMergedAccessAfterCallNoWrite_C2",
+                 "testCmpMergeWithNull_Second_C2",
+                 "testObjectIdentity_C2",
+                 "testSubclassesTrapping_C2",
+                 "testCmpMergeWithNull_C2",
+                 "testSubclasses_C2",
+                 "testPartialPhis_C2",
+                 "testPollutedNoWrite_C2",
+                 "testThreeWayAliasedAlloc_C2",
+                 "TestTrapAfterMerge_C2",
+                 "testNestedObjectsObject_C2",
+                 "testNestedObjectsNoEscapeObject_C2",
+                 "testNestedObjectsArray_C2",
+                 "testTrappingAfterMerge_C2",
+                 "testSimpleAliasedAlloc_C2",
+                 "testSimpleDoubleMerge_C2",
+                 "testConsecutiveSimpleMerge_C2",
+                 "testDoubleIfElseMerge_C2",
+                 "testNoEscapeWithLoadInLoop_C2",
+                 "testCmpAfterMerge_C2",
+                 "testCondAfterMergeWithAllocate_C2",
+                 "testCondLoadAfterMerge_C2",
+                 "testIfElseInLoop_C2",
+                 "testLoadInCondAfterMerge_C2",
+                 "testLoadInLoop_C2",
+                 "testMergesAndMixedEscape_C2",
+                 "testSRAndNSR_NoTrap_C2",
+                 "testSRAndNSR_Trap_C2",
+                 "testString_one_C2",
+                 "testString_two_C2"
+                })
+    public void runner(RunInfo info) {
+        Random random = info.getRandom();
+        boolean cond1 = random.nextBoolean();
+        boolean cond2 = random.nextBoolean();
+
+        int l = random.nextInt();
+        int w = random.nextInt();
+        int x = random.nextInt();
+        int y = random.nextInt();
+        int z = random.nextInt();
+
+        Asserts.assertEQ(testGlobalEscape_Interp(x, y),                             testGlobalEscape_C2(x, y));
+        Asserts.assertEQ(testArgEscape_Interp(x, y),                                testArgEscape_C2(x, y));
+        Asserts.assertEQ(testEscapeInCallAfterMerge_Interp(cond1, cond2, x, y),     testEscapeInCallAfterMerge_C2(cond1, cond2, x, y));
+        Asserts.assertEQ(testNoEscapeWithWriteInLoop_Interp(cond1, cond2, x, y),    testNoEscapeWithWriteInLoop_C2(cond1, cond2, x, y));
+        Asserts.assertEQ(testPollutedWithWrite_Interp(cond1, x),                    testPollutedWithWrite_C2(cond1, x));
+        Asserts.assertEQ(testPollutedPolymorphic_Interp(cond1, x),                  testPollutedPolymorphic_C2(cond1, x));
+        Asserts.assertEQ(testMergedLoadAfterDirectStore_Interp(cond1, x, y),        testMergedLoadAfterDirectStore_C2(cond1, x, y));
+        Asserts.assertEQ(testMergedAccessAfterCallWithWrite_Interp(cond1, x, y),    testMergedAccessAfterCallWithWrite_C2(cond1, x, y));
+        Asserts.assertEQ(testLoadAfterTrap_Interp(cond1, x, y),                     testLoadAfterTrap_C2(cond1, x, y));
+        Asserts.assertEQ(testCondAfterMergeWithNull_Interp(cond1, cond2, x, y),     testCondAfterMergeWithNull_C2(cond1, cond2, x, y));
+        Asserts.assertEQ(testLoadAfterLoopAlias_Interp(cond1, x, y),                testLoadAfterLoopAlias_C2(cond1, x, y));
+        Asserts.assertEQ(testCallTwoSide_Interp(cond1, x, y),                       testCallTwoSide_C2(cond1, x, y));
+        Asserts.assertEQ(testMergedAccessAfterCallNoWrite_Interp(cond1, x, y),      testMergedAccessAfterCallNoWrite_C2(cond1, x, y));
+        Asserts.assertEQ(testCmpMergeWithNull_Second_Interp(cond1, x, y),           testCmpMergeWithNull_Second_C2(cond1, x, y));
+        Asserts.assertEQ(testObjectIdentity_Interp(cond1, 42, y),                   testObjectIdentity_C2(cond1, 42, y));
+        Asserts.assertEQ(testSubclassesTrapping_Interp(cond1, cond2, x, y, w, z),   testSubclassesTrapping_C2(cond1, cond2, x, y, w, z));
+        Asserts.assertEQ(testCmpMergeWithNull_Interp(cond1, x, y),                  testCmpMergeWithNull_C2(cond1, x, y));
+        Asserts.assertEQ(testSubclasses_Interp(cond1, cond2, x, y, w, z),           testSubclasses_C2(cond1, cond2, x, y, w, z));
+        Asserts.assertEQ(testPartialPhis_Interp(cond1, l, x, y),                    testPartialPhis_C2(cond1, l, x, y));
+        Asserts.assertEQ(testPollutedNoWrite_Interp(cond1, l),                      testPollutedNoWrite_C2(cond1, l));
+        Asserts.assertEQ(testThreeWayAliasedAlloc_Interp(cond1, x, y),              testThreeWayAliasedAlloc_C2(cond1, x, y));
+        Asserts.assertEQ(TestTrapAfterMerge_Interp(cond1, x, y),                    TestTrapAfterMerge_C2(cond1, x, y));
+        Asserts.assertEQ(testNestedObjectsObject_Interp(cond1, x, y),               testNestedObjectsObject_C2(cond1, x, y));
+        Asserts.assertEQ(testNestedObjectsNoEscapeObject_Interp(cond1, x, y),       testNestedObjectsNoEscapeObject_C2(cond1, x, y));
+        Asserts.assertEQ(testTrappingAfterMerge_Interp(cond1, x, y),                testTrappingAfterMerge_C2(cond1, x, y));
+        Asserts.assertEQ(testSimpleAliasedAlloc_Interp(cond1, x, y),                testSimpleAliasedAlloc_C2(cond1, x, y));
+        Asserts.assertEQ(testSimpleDoubleMerge_Interp(cond1, x, y),                 testSimpleDoubleMerge_C2(cond1, x, y));
+        Asserts.assertEQ(testConsecutiveSimpleMerge_Interp(cond1, cond2, x, y),     testConsecutiveSimpleMerge_C2(cond1, cond2, x, y));
+        Asserts.assertEQ(testDoubleIfElseMerge_Interp(cond1, x, y),                 testDoubleIfElseMerge_C2(cond1, x, y));
+        Asserts.assertEQ(testNoEscapeWithLoadInLoop_Interp(cond1, x, y),            testNoEscapeWithLoadInLoop_C2(cond1, x, y));
+        Asserts.assertEQ(testCmpAfterMerge_Interp(cond1, cond2, x, y),              testCmpAfterMerge_C2(cond1, cond2, x, y));
+        Asserts.assertEQ(testCondAfterMergeWithAllocate_Interp(cond1, cond2, x, y), testCondAfterMergeWithAllocate_C2(cond1, cond2, x, y));
+        Asserts.assertEQ(testCondLoadAfterMerge_Interp(cond1, cond2, x, y),         testCondLoadAfterMerge_C2(cond1, cond2, x, y));
+        Asserts.assertEQ(testIfElseInLoop_Interp(),                                 testIfElseInLoop_C2());
+        Asserts.assertEQ(testLoadInCondAfterMerge_Interp(cond1, x, y),              testLoadInCondAfterMerge_C2(cond1, x, y));
+        Asserts.assertEQ(testLoadInLoop_Interp(cond1, x, y),                        testLoadInLoop_C2(cond1, x, y));
+        Asserts.assertEQ(testMergesAndMixedEscape_Interp(cond1, x, y),              testMergesAndMixedEscape_C2(cond1, x, y));
+        Asserts.assertEQ(testSRAndNSR_NoTrap_Interp(cond1, x, y),                   testSRAndNSR_NoTrap_C2(cond1, x, y));
+        Asserts.assertEQ(testString_one_Interp(cond1),                              testString_one_C2(cond1));
+        Asserts.assertEQ(testString_two_Interp(cond1),                              testString_two_C2(cond1));
+
+        Asserts.assertEQ(testSRAndNSR_Trap_Interp(false, cond1, cond2, x, y),
+                         testSRAndNSR_Trap_C2(info.isTestC2Compiled("testSRAndNSR_Trap_C2"), cond1, cond2, x, y));
+
+        var arr1 = testNestedObjectsArray_Interp(cond1, x, y);
+        var arr2 = testNestedObjectsArray_C2(cond1, x, y);
+
+        if (arr1.length != arr2.length) Asserts.fail("testNestedObjectsArray result size mismatch.");
+        for (int i=0; i<arr1.length; i++) {
+            if (!arr1[i].equals(arr2[i])) {
+                Asserts.fail("testNestedObjectsArray objects mismatch.");
+            }
+        }
+
+    }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     int testGlobalEscape(int x, int y) {
         Point p = new Point(x, y);
 
@@ -56,8 +192,20 @@ public class AllocationMergesTests {
     }
 
     @Test
+<<<<<<< HEAD
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH })
     @IR(counts = { IRNode.ALLOC, "1" })
+=======
+    @IR(counts = { IRNode.ALLOC, "1" })
+    int testGlobalEscape_C2(int x, int y) { return testGlobalEscape(x, y); }
+
+    @DontCompile
+    int testGlobalEscape_Interp(int x, int y) { return testGlobalEscape(x, y); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     int testArgEscape(int x, int y) {
         Point p = new Point(x, y);
 
@@ -67,8 +215,20 @@ public class AllocationMergesTests {
     }
 
     @Test
+<<<<<<< HEAD
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH })
     @IR(counts = { IRNode.ALLOC, "2" })
+=======
+    @IR(counts = { IRNode.ALLOC, "1" })
+    int testArgEscape_C2(int x, int y) { return testArgEscape(x, y); }
+
+    @DontCompile
+    int testArgEscape_Interp(int x, int y) { return testArgEscape(x, y); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     int testEscapeInCallAfterMerge(boolean cond, boolean cond2, int x, int y) {
         Point p = new Point(x, x);
 
@@ -84,9 +244,21 @@ public class AllocationMergesTests {
     }
 
     @Test
+<<<<<<< HEAD
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH })
     @IR(counts = { IRNode.ALLOC, "2" })
     // Merge won't be reduced because of the write to the fields
+=======
+    @IR(counts = { IRNode.ALLOC, "2" })
+    int testEscapeInCallAfterMerge_C2(boolean cond, boolean cond2, int x, int y) { return testEscapeInCallAfterMerge(cond, cond2, x, y); }
+
+    @DontCompile
+    int testEscapeInCallAfterMerge_Interp(boolean cond, boolean cond2, int x, int y) { return testEscapeInCallAfterMerge(cond, cond2, x, y); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     int testNoEscapeWithWriteInLoop(boolean cond, boolean cond2, int x, int y) {
         Point p = new Point(x, y);
         int res = 0;
@@ -104,9 +276,22 @@ public class AllocationMergesTests {
     }
 
     @Test
+<<<<<<< HEAD
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH })
     @IR(counts = { IRNode.ALLOC, "2" })
     // Merge won't be reduced because of the write to the field
+=======
+    @IR(counts = { IRNode.ALLOC, "2" })
+    // Merge won't be reduced because of the write to the fields
+    int testNoEscapeWithWriteInLoop_C2(boolean cond, boolean cond2, int x, int y) { return testNoEscapeWithWriteInLoop(cond, cond2, x, y); }
+
+    @DontCompile
+    int testNoEscapeWithWriteInLoop_Interp(boolean cond, boolean cond2, int x, int y) { return testNoEscapeWithWriteInLoop(cond, cond2, x, y); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     int testPollutedWithWrite(boolean cond, int l) {
         Shape obj1 = new Square(l);
         Shape obj2 = new Square(l);
@@ -126,8 +311,20 @@ public class AllocationMergesTests {
     }
 
     @Test
+<<<<<<< HEAD
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH })
     @IR(failOn = { IRNode.ALLOC })
+=======
+    @IR(counts = { IRNode.ALLOC, "2" })
+    // Merge won't be reduced because of the write to the field
+    int testPollutedWithWrite_C2(boolean cond, int l) { return testPollutedWithWrite(cond, l); }
+
+    @DontCompile
+    int testPollutedWithWrite_Interp(boolean cond, int l) { return testPollutedWithWrite(cond, l); }
+
+    // -------------------------------------------------------------------------
+    @ForceInline
+>>>>>>> origin/master
     int testPollutedPolymorphic(boolean cond, int l) {
         Shape obj1 = new Square(l);
         Shape obj2 = new Circle(l);
@@ -142,9 +339,22 @@ public class AllocationMergesTests {
     }
 
     @Test
+<<<<<<< HEAD
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH })
     @IR(counts = { IRNode.ALLOC, "2" })
     // Merge won't be reduced because write to one of the inputs *after* the merge
+=======
+    @IR(counts = { IRNode.ALLOC, "2" })
+    // Merge won't be reduced because the inputs to the Phi have different Klasses
+    int testPollutedPolymorphic_C2(boolean cond, int l) { return testPollutedPolymorphic(cond, l); }
+
+    @DontCompile
+    int testPollutedPolymorphic_Interp(boolean cond, int l) { return testPollutedPolymorphic(cond, l); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     int testMergedLoadAfterDirectStore(boolean cond, int x, int y) {
         Point p0 = new Point(x, x);
         Point p1 = new Point(y, y);
@@ -162,11 +372,24 @@ public class AllocationMergesTests {
     }
 
     @Test
+<<<<<<< HEAD
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH })
     @IR(counts = { IRNode.ALLOC, "3" })
     // Objects won't be scalar replaced because:
     //  - p is written inside the loop.
     //  - p2 is ArgEscape
+=======
+    @IR(counts = { IRNode.ALLOC, "2" })
+    // Merge won't be reduced because write to one of the inputs *after* the merge
+    int testMergedLoadAfterDirectStore_C2(boolean cond, int x, int y) { return testMergedLoadAfterDirectStore(cond, x, y); }
+
+    @DontCompile
+    int testMergedLoadAfterDirectStore_Interp(boolean cond, int x, int y) { return testMergedLoadAfterDirectStore(cond, x, y); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     int testMergedAccessAfterCallWithWrite(boolean cond, int x, int y) {
         Point p2 = new Point(x, x);
         Point p = new Point(y, y);
@@ -187,9 +410,24 @@ public class AllocationMergesTests {
     }
 
     @Test
+<<<<<<< HEAD
     @Arguments({ Argument.BOOLEAN_TOGGLE_FIRST_FALSE, Argument.RANDOM_EACH, Argument.RANDOM_EACH })
     @IR(counts = { IRNode.ALLOC, "2" })
     // The allocations won't be removed because 'split_through_phi' won't split the load through the bases.
+=======
+    @IR(counts = { IRNode.ALLOC, "3" })
+    // Objects won't be scalar replaced because:
+    //  - p is written inside the loop.
+    //  - p2 is ArgEscape
+    int testMergedAccessAfterCallWithWrite_C2(boolean cond, int x, int y) { return testMergedAccessAfterCallWithWrite(cond, x, y); }
+
+    @DontCompile
+    int testMergedAccessAfterCallWithWrite_Interp(boolean cond, int x, int y) { return testMergedAccessAfterCallWithWrite(cond, x, y); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     int testLoadAfterTrap(boolean cond, int x, int y) {
         Point p = null;
 
@@ -205,8 +443,21 @@ public class AllocationMergesTests {
     }
 
     @Test
+<<<<<<< HEAD
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH })
     @IR(failOn = { IRNode.ALLOC })
+=======
+    @IR(counts = { IRNode.ALLOC, "2" })
+    // The allocations won't be removed because 'split_through_phi' won't split the load through the bases.
+    int testLoadAfterTrap_C2(boolean cond, int x, int y) { return testLoadAfterTrap(cond, x, y); }
+
+    @DontCompile
+    int testLoadAfterTrap_Interp(boolean cond, int x, int y) { return testLoadAfterTrap(cond, x, y); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     int testCondAfterMergeWithNull(boolean cond1, boolean cond2, int x, int y) {
         Point p = null;
 
@@ -222,9 +473,22 @@ public class AllocationMergesTests {
     }
 
     @Test
+<<<<<<< HEAD
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH })
     @IR(failOn = { IRNode.ALLOC })
     // Both allocations should be removed
+=======
+    @IR(counts = { IRNode.ALLOC, "1" })
+    // The merge won't be simplified because the merge with NULL
+    int testCondAfterMergeWithNull_C2(boolean cond1, boolean cond2, int x, int y) { return testCondAfterMergeWithNull(cond1, cond2, x, y); }
+
+    @DontCompile
+    int testCondAfterMergeWithNull_Interp(boolean cond1, boolean cond2, int x, int y) { return testCondAfterMergeWithNull(cond1, cond2, x, y); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     int testLoadAfterLoopAlias(boolean cond, int x, int y) {
         Point a = new Point(x, y);
         Point b = new Point(y, x);
@@ -240,9 +504,22 @@ public class AllocationMergesTests {
     }
 
     @Test
+<<<<<<< HEAD
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH })
     @IR(counts = { IRNode.CALL, "3" })
     // Merge won't be reduced because both of the inputs are NSR
+=======
+    @IR(failOn = { IRNode.ALLOC })
+    // Both allocations should be removed
+    int testLoadAfterLoopAlias_C2(boolean cond, int x, int y) { return testLoadAfterLoopAlias(cond, x, y); }
+
+    @DontCompile
+    int testLoadAfterLoopAlias_Interp(boolean cond, int x, int y) { return testLoadAfterLoopAlias(cond, x, y); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     int testCallTwoSide(boolean cond1, int x, int y) {
         Point p = dummy(x, y);
 
@@ -250,6 +527,7 @@ public class AllocationMergesTests {
             p = dummy(y, x);
         }
 
+<<<<<<< HEAD
         return p.x;
     }
 
@@ -258,6 +536,23 @@ public class AllocationMergesTests {
     @IR(counts = { IRNode.ALLOC, "3" })
     // p2 escapes and therefore won't be removed.
     // The allocations won't be removed because 'split_through_phi' won't split the load through the bases.
+=======
+        return (p != null) ? p.x : 0;
+    }
+
+    @Test
+    @IR(counts = { IRNode.CALL, "<=3" })
+    // Merge won't be reduced because both of the inputs are NSR.
+    // There could be 3 call nodes because one if can became an unstable trap.
+    int testCallTwoSide_C2(boolean cond1, int x, int y) { return testCallTwoSide(cond1, x, y); }
+
+    @DontCompile
+    int testCallTwoSide_Interp(boolean cond1, int x, int y) { return testCallTwoSide(cond1, x, y); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     int testMergedAccessAfterCallNoWrite(boolean cond, int x, int y) {
         Point p2 = new Point(x, x);
         Point p = new Point(y, y);
@@ -279,8 +574,22 @@ public class AllocationMergesTests {
     }
 
     @Test
+<<<<<<< HEAD
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH })
     @IR(failOn = { IRNode.ALLOC })
+=======
+    @IR(counts = { IRNode.ALLOC, "3" })
+    // p2 escapes and therefore won't be removed.
+    // The allocations won't be removed because 'split_through_phi' won't split the load through the bases.
+    int testMergedAccessAfterCallNoWrite_C2(boolean cond, int x, int y) { return testMergedAccessAfterCallNoWrite(cond, x, y); }
+
+    @DontCompile
+    int testMergedAccessAfterCallNoWrite_Interp(boolean cond, int x, int y) { return testMergedAccessAfterCallNoWrite(cond, x, y); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     int testCmpMergeWithNull_Second(boolean cond, int x, int y) {
         Point p = null;
 
@@ -298,8 +607,21 @@ public class AllocationMergesTests {
     }
 
     @Test
+<<<<<<< HEAD
     @Arguments({ Argument.RANDOM_EACH, Argument.NUMBER_42, Argument.RANDOM_EACH })
     @IR(failOn = { IRNode.ALLOC })
+=======
+    @IR(counts = { IRNode.ALLOC, "1" })
+    // Merge won't be reduced because, among other things, one of the inputs is null.
+    int testCmpMergeWithNull_Second_C2(boolean cond, int x, int y) { return testCmpMergeWithNull_Second(cond, x, y); }
+
+    @DontCompile
+    int testCmpMergeWithNull_Second_Interp(boolean cond, int x, int y) { return testCmpMergeWithNull_Second(cond, x, y); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     int testObjectIdentity(boolean cond, int x, int y) {
         Point o = new Point(x, y);
 
@@ -311,10 +633,23 @@ public class AllocationMergesTests {
     }
 
     @Test
+<<<<<<< HEAD
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH })
     @IR(counts = { IRNode.ALLOC, "2" })
     // The initial allocation assigned to 's' will always be dead.
     // The other two allocations assigned to 's' won't be removed because they have different type.
+=======
+    @IR(counts = { IRNode.ALLOC, "1" })
+    // The allocation won't be removed because the merge doesn't have exact type
+    int testObjectIdentity_C2(boolean cond, int x, int y) { return testObjectIdentity(cond, x, y); }
+
+    @DontCompile
+    int testObjectIdentity_Interp(boolean cond, int x, int y) { return testObjectIdentity(cond, x, y); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     int testSubclassesTrapping(boolean c1, boolean c2, int x, int y, int w, int z) {
         new A();
         Root s = new Home(x, y);
@@ -336,8 +671,22 @@ public class AllocationMergesTests {
     }
 
     @Test
+<<<<<<< HEAD
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH })
     @IR(failOn = { IRNode.ALLOC })
+=======
+    @IR(counts = { IRNode.ALLOC, "2" })
+    // The initial allocation assigned to 's' will always be dead.
+    // The other two allocations assigned to 's' won't be removed because they have different type.
+    int testSubclassesTrapping_C2(boolean c1, boolean c2, int x, int y, int w, int z) { return testSubclassesTrapping(c1, c2, x, y, w, z); }
+
+    @DontCompile
+    int testSubclassesTrapping_Interp(boolean c1, boolean c2, int x, int y, int w, int z) { return testSubclassesTrapping(c1, c2, x, y, w, z); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     int testCmpMergeWithNull(boolean cond, int x, int y) {
         Point p = null;
 
@@ -355,8 +704,20 @@ public class AllocationMergesTests {
     }
 
     @Test
+<<<<<<< HEAD
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH })
     @IR(failOn = { IRNode.ALLOC })
+=======
+    @IR(counts = { IRNode.ALLOC, "2" })
+    int testCmpMergeWithNull_C2(boolean cond, int x, int y) { return testCmpMergeWithNull(cond, x, y); }
+
+    @DontCompile
+    int testCmpMergeWithNull_Interp(boolean cond, int x, int y) { return testCmpMergeWithNull(cond, x, y); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     int testSubclasses(boolean c1, boolean c2, int x, int y, int w, int z) {
         new A();
         Root s = new Home(x, y);
@@ -377,6 +738,7 @@ public class AllocationMergesTests {
         return s.a;
     }
 
+<<<<<<< HEAD
 
     // ------------------ Some Scalar Replacement Should Happen in The Tests Below ------------------- //
 
@@ -384,6 +746,21 @@ public class AllocationMergesTests {
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH })
     @IR(failOn = { IRNode.ALLOC })
     // all allocations will be dead
+=======
+    @Test
+    @IR(counts = { IRNode.ALLOC, "2" })
+    // The unused allocation will be removed.
+    // The other two allocations assigned to 's' won't be removed because they have different type.
+    int testSubclasses_C2(boolean c1, boolean c2, int x, int y, int w, int z) { return testSubclasses(c1, c2, x, y, w, z); }
+
+    @DontCompile
+    int testSubclasses_Interp(boolean c1, boolean c2, int x, int y, int w, int z) { return testSubclasses(c1, c2, x, y, w, z); }
+
+
+    // ------------------ Some Scalar Replacement Should Happen in The Tests Below ------------------- //
+
+    @ForceInline
+>>>>>>> origin/master
     int testPartialPhis(boolean cond, int l, int x, int y) {
         int k = l;
 
@@ -401,10 +778,24 @@ public class AllocationMergesTests {
     }
 
     @Test
+<<<<<<< HEAD
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH })
     @IR(failOn = { IRNode.ALLOC })
     // Both allocations will be removed. After initialization they are read-only objects.
     // Access to the input of the merge, after the merge, is fine.
+=======
+    @IR(failOn = { IRNode.ALLOC })
+    // all allocations will be dead
+    int testPartialPhis_C2(boolean cond, int l, int x, int y) { return testPartialPhis(cond, l, x, y); }
+
+    @DontCompile
+    int testPartialPhis_Interp(boolean cond, int l, int x, int y) { return testPartialPhis(cond, l, x, y); }
+
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     int testPollutedNoWrite(boolean cond, int l) {
         Shape obj1 = new Square(l);
         Shape obj2 = new Square(l);
@@ -425,10 +816,24 @@ public class AllocationMergesTests {
     }
 
     @Test
+<<<<<<< HEAD
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH })
     @IR(failOn = { IRNode.ALLOC })
     // Initial p3 will always be dead.
     // The other two allocations will be reduced and scaled
+=======
+    @IR(failOn = { IRNode.ALLOC })
+    // Both allocations will be removed. After initialization they are read-only objects.
+    // Access to the input of the merge, after the merge, is fine.
+    int testPollutedNoWrite_C2(boolean cond, int l) { return testPollutedNoWrite(cond, l); }
+
+    @DontCompile
+    int testPollutedNoWrite_Interp(boolean cond, int l) { return testPollutedNoWrite(cond, l); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     int testThreeWayAliasedAlloc(boolean cond, int x, int y) {
         Point p1 = new Point(x, y);
         Point p2 = new Point(x+1, y+1);
@@ -444,9 +849,23 @@ public class AllocationMergesTests {
     }
 
     @Test
+<<<<<<< HEAD
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH })
     @IR(failOn = { IRNode.ALLOC })
     // Both allocations will be eliminated.
+=======
+    @IR(failOn = { IRNode.ALLOC })
+    // Initial p3 will always be dead.
+    // The other two allocations will be reduced and scaled
+    int testThreeWayAliasedAlloc_C2(boolean cond, int x, int y) { return testThreeWayAliasedAlloc(cond, x, y); }
+
+    @DontCompile
+    int testThreeWayAliasedAlloc_Interp(boolean cond, int x, int y) { return testThreeWayAliasedAlloc(cond, x, y); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     int TestTrapAfterMerge(boolean cond, int x, int y) {
         Point p = new Point(x, x);
 
@@ -462,9 +881,22 @@ public class AllocationMergesTests {
     }
 
     @Test
+<<<<<<< HEAD
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH })
     @IR(counts = { IRNode.ALLOC, "2" })
     // The allocation of "Picture" will be removed and only allocations of "Position" will be kept
+=======
+    @IR(failOn = { IRNode.ALLOC })
+    // Both allocations will be eliminated.
+    int TestTrapAfterMerge_C2(boolean cond, int x, int y) { return TestTrapAfterMerge(cond, x, y); }
+
+    @DontCompile
+    int TestTrapAfterMerge_Interp(boolean cond, int x, int y) { return TestTrapAfterMerge(cond, x, y); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     Point testNestedObjectsObject(boolean cond, int x, int y) {
         Picture p = new Picture(x, x, y);
 
@@ -476,11 +908,24 @@ public class AllocationMergesTests {
     }
 
     @Test
+<<<<<<< HEAD
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH })
     @IR(counts = { IRNode.ALLOC, "2" } )
     // The two Picture objects will be removed. The nested Point objects won't
     // be removed because the Phi merging them will have a DecodeN user - which
     // currently isn't supported.
+=======
+    @IR(counts = { IRNode.ALLOC, "2" })
+    // The allocation of "Picture" will be removed and only allocations of "Position" will be kept
+    Point testNestedObjectsObject_C2(boolean cond, int x, int y) { return testNestedObjectsObject(cond, x, y); }
+
+    @DontCompile
+    Point testNestedObjectsObject_Interp(boolean cond, int x, int y) { return testNestedObjectsObject(cond, x, y); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     int testNestedObjectsNoEscapeObject(boolean cond, int x, int y) {
         Picture p = new Picture(x, x, y);
 
@@ -492,9 +937,24 @@ public class AllocationMergesTests {
     }
 
     @Test
+<<<<<<< HEAD
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH })
     @IR(counts = { IRNode.ALLOC, "4" })
     // The two PicturePositions objects will be reduced and scaled.
+=======
+    @IR(counts = { IRNode.ALLOC, "2" } )
+    // The two Picture objects will be removed. The nested Point objects won't
+    // be removed because the Phi merging them will have a DecodeN user - which
+    // currently isn't supported.
+    int testNestedObjectsNoEscapeObject_C2(boolean cond, int x, int y) { return testNestedObjectsNoEscapeObject(cond, x, y); }
+
+    @DontCompile
+    int testNestedObjectsNoEscapeObject_Interp(boolean cond, int x, int y) { return testNestedObjectsNoEscapeObject(cond, x, y); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     Point[] testNestedObjectsArray(boolean cond, int x, int y) {
         PicturePositions p = new PicturePositions(x, y, x+y);
 
@@ -506,10 +966,23 @@ public class AllocationMergesTests {
     }
 
     @Test
+<<<<<<< HEAD
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH })
     @IR(failOn = { IRNode.ALLOC })
     // The allocation inside the last if will be removed because it's not part of a merge
     // The other two allocations will be reduced and removed
+=======
+    @IR(counts = { IRNode.ALLOC, "4" })
+    // The two PicturePositions objects will be reduced and scaled.
+    Point[] testNestedObjectsArray_C2(boolean cond, int x, int y) { return testNestedObjectsArray(cond, x, y); }
+
+    @DontCompile
+    Point[] testNestedObjectsArray_Interp(boolean cond, int x, int y) { return testNestedObjectsArray(cond, x, y); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     int testTrappingAfterMerge(boolean cond, int x, int y) {
         Point p = new Point(x, y);
         int res = 0;
@@ -530,9 +1003,23 @@ public class AllocationMergesTests {
     }
 
     @Test
+<<<<<<< HEAD
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH })
     @IR(failOn = { IRNode.ALLOC })
     // Both merges will be reduced and removed
+=======
+    @IR(failOn = { IRNode.ALLOC })
+    // The allocation inside the last if will be removed because it's not part of a merge
+    // The other two allocations will be reduced and removed
+    int testTrappingAfterMerge_C2(boolean cond, int x, int y) { return testTrappingAfterMerge(cond, x, y); }
+
+    @DontCompile
+    int testTrappingAfterMerge_Interp(boolean cond, int x, int y) { return testTrappingAfterMerge(cond, x, y); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     int testSimpleAliasedAlloc(boolean cond, int x, int y) {
         Point p1 = new Point(x, y);
         Point p2 = new Point(y, x);
@@ -546,9 +1033,22 @@ public class AllocationMergesTests {
     }
 
     @Test
+<<<<<<< HEAD
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH })
     @IR(failOn = { IRNode.ALLOC })
     // Both merges will be reduced and removed
+=======
+    @IR(failOn = { IRNode.ALLOC })
+    // Both merges will be reduced and removed
+    int testSimpleAliasedAlloc_C2(boolean cond, int x, int y) { return testSimpleAliasedAlloc(cond, x, y); }
+
+    @DontCompile
+    int testSimpleAliasedAlloc_Interp(boolean cond, int x, int y) { return testSimpleAliasedAlloc(cond, x, y); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     int testSimpleDoubleMerge(boolean cond, int x, int y) {
         Point p1 = new Point(x, y);
         Point p2 = new Point(x+1, y+1);
@@ -562,9 +1062,22 @@ public class AllocationMergesTests {
     }
 
     @Test
+<<<<<<< HEAD
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH })
     @IR(failOn = { IRNode.ALLOC })
     // All allocations will be removed.
+=======
+    @IR(failOn = { IRNode.ALLOC })
+    // Both merges will be reduced and removed
+    int testSimpleDoubleMerge_C2(boolean cond, int x, int y) { return testSimpleDoubleMerge(cond, x, y); }
+
+    @DontCompile
+    int testSimpleDoubleMerge_Interp(boolean cond, int x, int y) { return testSimpleDoubleMerge(cond, x, y); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     int testConsecutiveSimpleMerge(boolean cond1, boolean cond2, int x, int y) {
         Point p0 = new Point(x, x);
         Point p1 = new Point(x, y);
@@ -590,10 +1103,23 @@ public class AllocationMergesTests {
     }
 
     @Test
+<<<<<<< HEAD
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH })
     @IR(failOn = { IRNode.ALLOC })
     // The initial allocation is always dead. The other
     // two will be reduced and scaled.
+=======
+    @IR(failOn = { IRNode.ALLOC })
+    // All allocations will be removed.
+    int testConsecutiveSimpleMerge_C2(boolean cond1, boolean cond2, int x, int y) { return testConsecutiveSimpleMerge(cond1, cond2, x, y); }
+
+    @DontCompile
+    int testConsecutiveSimpleMerge_Interp(boolean cond1, boolean cond2, int x, int y) { return testConsecutiveSimpleMerge(cond1, cond2, x, y); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     int testDoubleIfElseMerge(boolean cond, int x, int y) {
         Point p1 = new Point(x, y);
         Point p2 = new Point(x+1, y+1);
@@ -610,9 +1136,23 @@ public class AllocationMergesTests {
     }
 
     @Test
+<<<<<<< HEAD
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH })
     @IR(failOn = { IRNode.ALLOC })
     // Both allocations will be reduced and scaled.
+=======
+    @IR(failOn = { IRNode.ALLOC })
+    // The initial allocation is always dead. The other
+    // two will be reduced and scaled.
+    int testDoubleIfElseMerge_C2(boolean cond, int x, int y) { return testDoubleIfElseMerge(cond, x, y); }
+
+    @DontCompile
+    int testDoubleIfElseMerge_Interp(boolean cond, int x, int y) { return testDoubleIfElseMerge(cond, x, y); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     int testNoEscapeWithLoadInLoop(boolean cond, int x, int y) {
         Point p = new Point(x, y);
         int res = 0;
@@ -629,9 +1169,22 @@ public class AllocationMergesTests {
     }
 
     @Test
+<<<<<<< HEAD
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH })
     @IR(failOn = { IRNode.ALLOC })
     // Both allocations will be reduced and scaled
+=======
+    @IR(failOn = { IRNode.ALLOC })
+    // Both allocations will be reduced and scaled.
+    int testNoEscapeWithLoadInLoop_C2(boolean cond, int x, int y) { return testNoEscapeWithLoadInLoop(cond, x, y); }
+
+    @DontCompile
+    int testNoEscapeWithLoadInLoop_Interp(boolean cond, int x, int y) { return testNoEscapeWithLoadInLoop(cond, x, y); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     int testCmpAfterMerge(boolean cond, boolean cond2, int x, int y) {
         Point a = new Point(x, y);
         Point b = new Point(y, x);
@@ -647,9 +1200,22 @@ public class AllocationMergesTests {
     }
 
     @Test
+<<<<<<< HEAD
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH })
     @IR(failOn = { IRNode.ALLOC })
     // Both allocations will be eliminated.
+=======
+    @IR(failOn = { IRNode.ALLOC })
+    // Both allocations will be reduced and scaled
+    int testCmpAfterMerge_C2(boolean cond, boolean cond2, int x, int y) { return testCmpAfterMerge(cond, cond2, x, y); }
+
+    @DontCompile
+    int testCmpAfterMerge_Interp(boolean cond, boolean cond2, int x, int y) { return testCmpAfterMerge(cond, cond2, x, y); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     int testCondAfterMergeWithAllocate(boolean cond1, boolean cond2, int x, int y) {
         Point p = new Point(x, y);
 
@@ -665,9 +1231,22 @@ public class AllocationMergesTests {
     }
 
     @Test
+<<<<<<< HEAD
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH })
     @IR(failOn = { IRNode.ALLOC })
     // Both allocations will be eliminated.
+=======
+    @IR(failOn = { IRNode.ALLOC })
+    // Both allocations will be eliminated.
+    int testCondAfterMergeWithAllocate_C2(boolean cond1, boolean cond2, int x, int y) { return testCondAfterMergeWithAllocate(cond1, cond2, x, y); }
+
+    @DontCompile
+    int testCondAfterMergeWithAllocate_Interp(boolean cond1, boolean cond2, int x, int y) { return testCondAfterMergeWithAllocate(cond1, cond2, x, y); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     int testCondLoadAfterMerge(boolean cond1, boolean cond2, int x, int y) {
         Point p = new Point(x, y);
 
@@ -690,8 +1269,20 @@ public class AllocationMergesTests {
 
     @Test
     @IR(failOn = { IRNode.ALLOC })
+<<<<<<< HEAD
     // The initial allocation is always dead. The other
     // two will be reduced and scaled.
+=======
+    // Both allocations will be eliminated.
+    int testCondLoadAfterMerge_C2(boolean cond1, boolean cond2, int x, int y) { return testCondLoadAfterMerge(cond1, cond2, x, y); }
+
+    @DontCompile
+    int testCondLoadAfterMerge_Interp(boolean cond1, boolean cond2, int x, int y) { return testCondLoadAfterMerge(cond1, cond2, x, y); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     int testIfElseInLoop() {
         int res = 0;
 
@@ -711,9 +1302,23 @@ public class AllocationMergesTests {
     }
 
     @Test
+<<<<<<< HEAD
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH })
     @IR(failOn = { IRNode.ALLOC })
     // Both allocations will be reduced and removed.
+=======
+    @IR(failOn = { IRNode.ALLOC })
+    // The initial allocation is always dead. The other
+    // two will be reduced and scaled.
+    int testIfElseInLoop_C2() { return testIfElseInLoop(); }
+
+    @DontCompile
+    int testIfElseInLoop_Interp() { return testIfElseInLoop(); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     int testLoadInCondAfterMerge(boolean cond, int x, int y) {
         Point p = new Point(x, y);
 
@@ -739,9 +1344,22 @@ public class AllocationMergesTests {
     }
 
     @Test
+<<<<<<< HEAD
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH })
     @IR(failOn = { IRNode.ALLOC })
     // Both allocations will be reduced and removed.
+=======
+    @IR(failOn = { IRNode.ALLOC })
+    // Both allocations will be reduced and removed.
+    int testLoadInCondAfterMerge_C2(boolean cond, int x, int y) { return testLoadInCondAfterMerge(cond, x, y); }
+
+    @DontCompile
+    int testLoadInCondAfterMerge_Interp(boolean cond, int x, int y) { return testLoadInCondAfterMerge(cond, x, y); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     int testLoadInLoop(boolean cond, int x, int y) {
         Point obj1 = new Point(x, y);
         Point obj2 = new Point(y, x);
@@ -762,9 +1380,22 @@ public class AllocationMergesTests {
     }
 
     @Test
+<<<<<<< HEAD
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH })
     @IR(counts = { IRNode.ALLOC, "1" })
     // p2 escapes and will remain. The other two allocations will be reduced and scaled.
+=======
+    @IR(failOn = { IRNode.ALLOC })
+    // Both allocations will be reduced and removed.
+    int testLoadInLoop_C2(boolean cond, int x, int y) { return testLoadInLoop(cond, x, y); }
+
+    @DontCompile
+    int testLoadInLoop_Interp(boolean cond, int x, int y) { return testLoadInLoop(cond, x, y); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     int testMergesAndMixedEscape(boolean cond, int x, int y) {
         Point p1 = new Point(x, y);
         Point p2 = new Point(x, y);
@@ -779,9 +1410,22 @@ public class AllocationMergesTests {
     }
 
     @Test
+<<<<<<< HEAD
     @Arguments({ Argument.RANDOM_EACH, Argument.RANDOM_EACH, Argument.RANDOM_EACH })
     @IR(counts = { IRNode.ALLOC, "2" }, phase = CompilePhase.PHASEIDEAL_BEFORE_EA)
     @IR(counts = { IRNode.ALLOC, "1" }, phase = CompilePhase.ITER_GVN_AFTER_ELIMINATION)
+=======
+    @IR(counts = { IRNode.ALLOC, "1" })
+    // p2 escapes and will remain. The other two allocations will be reduced and scaled.
+    int testMergesAndMixedEscape_C2(boolean cond, int x, int y) { return testMergesAndMixedEscape(cond, x, y); }
+
+    @DontCompile
+    int testMergesAndMixedEscape_Interp(boolean cond, int x, int y) { return testMergesAndMixedEscape(cond, x, y); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     int testSRAndNSR_NoTrap(boolean cond1, int x, int y) {
         Point p = new Point(x, y);
 
@@ -794,12 +1438,25 @@ public class AllocationMergesTests {
     }
 
     @Test
+<<<<<<< HEAD
     @Warmup(2000)
     @Arguments({ Argument.RANDOM_EACH, Argument.FALSE, Argument.RANDOM_EACH, Argument.RANDOM_EACH })
     @IR(counts = { IRNode.ALLOC, "2" }, phase = CompilePhase.PHASEIDEAL_BEFORE_EA)
     @IR(counts = { IRNode.ALLOC, "1" }, phase = CompilePhase.ITER_GVN_AFTER_ELIMINATION)
     int testSRAndNSR_Trap(boolean cond1, boolean cond2, int x, int y) {
         invocations++;
+=======
+    @IR(counts = { IRNode.ALLOC, "<=1" })
+    int testSRAndNSR_NoTrap_C2(boolean cond1, int x, int y) { return testSRAndNSR_NoTrap(cond1, x, y); }
+
+    @DontCompile
+    int testSRAndNSR_NoTrap_Interp(boolean cond1, int x, int y) { return testSRAndNSR_NoTrap(cond1, x, y); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+    int testSRAndNSR_Trap(boolean is_c2, boolean cond1, boolean cond2, int x, int y) {
+>>>>>>> origin/master
         Point p = new Point(x, y);
 
         if (cond1) {
@@ -807,18 +1464,36 @@ public class AllocationMergesTests {
             global_escape = p;
         }
 
+<<<<<<< HEAD
         if (invocations == 2001) {
             // This will show up to C2 as a trap.
             new ADefaults();
+=======
+        if (is_c2) {
+            // This will show up to C2 as a trap.
+            dummy_defaults();
+>>>>>>> origin/master
         }
 
         return p.y;
     }
 
     @Test
+<<<<<<< HEAD
     @Arguments({ Argument.RANDOM_EACH })
     @IR(counts = { IRNode.ALLOC, "2" }, phase = CompilePhase.PHASEIDEAL_BEFORE_EA)
     @IR(counts = { IRNode.ALLOC, "0" }, phase = CompilePhase.ITER_GVN_AFTER_ELIMINATION)
+=======
+    @IR(counts = { IRNode.ALLOC, "<=1" })
+    int testSRAndNSR_Trap_C2(boolean is_c2, boolean cond1, boolean cond2, int x, int y) { return testSRAndNSR_Trap(is_c2, cond1, cond2, x, y); }
+
+    @DontCompile
+    int testSRAndNSR_Trap_Interp(boolean is_c2, boolean cond1, boolean cond2, int x, int y) { return testSRAndNSR_Trap(is_c2, cond1, cond2, x, y); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     char testString_one(boolean cond1) {
         String p = new String("Java");
 
@@ -830,9 +1505,21 @@ public class AllocationMergesTests {
     }
 
     @Test
+<<<<<<< HEAD
     @Arguments({ Argument.RANDOM_EACH })
     @IR(counts = { IRNode.ALLOC, "1" }, phase = CompilePhase.PHASEIDEAL_BEFORE_EA)
     @IR(counts = { IRNode.ALLOC, "0" }, phase = CompilePhase.ITER_GVN_AFTER_ELIMINATION)
+=======
+    @IR(counts = { IRNode.ALLOC, "0" })
+    char testString_one_C2(boolean cond1) { return testString_one(cond1); }
+
+    @DontCompile
+    char testString_one_Interp(boolean cond1) { return testString_one(cond1); }
+
+    // -------------------------------------------------------------------------
+
+    @ForceInline
+>>>>>>> origin/master
     char testString_two(boolean cond1) {
         String p = new String("HotSpot");
 
@@ -844,6 +1531,16 @@ public class AllocationMergesTests {
         return p.charAt(0);
     }
 
+<<<<<<< HEAD
+=======
+    @Test
+    @IR(counts = { IRNode.ALLOC, "0" })
+    char testString_two_C2(boolean cond1) { return testString_two(cond1); }
+
+    @DontCompile
+    char testString_two_Interp(boolean cond1) { return testString_two(cond1); }
+
+>>>>>>> origin/master
     // ------------------ Utility for Testing ------------------- //
 
     @DontCompile
@@ -881,6 +1578,17 @@ public class AllocationMergesTests {
             this.x = x;
             this.y = y;
         }
+<<<<<<< HEAD
+=======
+
+        @Override
+        public boolean equals(Object o) {
+            if (o == this) return true;
+            if (!(o instanceof Point)) return false;
+            Point p = (Point) o;
+            return (p.x == x) && (p.y == y);
+        }
+>>>>>>> origin/master
     }
 
     class Shape {

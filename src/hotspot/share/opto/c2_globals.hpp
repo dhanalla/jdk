@@ -182,9 +182,6 @@
            "Map number of unrolls for main loop via "                       \
            "Superword Level Parallelism analysis")                          \
                                                                             \
-  product(bool, PostLoopMultiversioning, false, EXPERIMENTAL,               \
-           "Multi versioned post loops to eliminate range checks")          \
-                                                                            \
   notproduct(bool, TraceSuperWordLoopUnrollAnalysis, false,                 \
           "Trace what Superword Level Parallelism analysis applies")        \
                                                                             \
@@ -470,10 +467,10 @@
   develop(bool, TracePostallocExpand, false, "Trace expanding nodes after"  \
           " register allocation.")                                          \
                                                                             \
-  product(bool, ReduceAllocationMerges, true,                               \
+  product(bool, ReduceAllocationMerges, true, DIAGNOSTIC,                   \
           "Try to simplify allocation merges before Scalar Replacement")    \
                                                                             \
-  develop(bool, TraceReduceAllocationMerges, false,                         \
+  notproduct(bool, TraceReduceAllocationMerges, false,                      \
           "Trace decision for simplifying allocation merges.")              \
                                                                             \
   product(bool, DoEscapeAnalysis, true,                                     \

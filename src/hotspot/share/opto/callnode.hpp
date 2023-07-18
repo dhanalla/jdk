@@ -513,16 +513,13 @@ class SafePointScalarObjectNode: public TypeNode {
 
   Node* _alloc;                   // Just for debugging purposes.
 
-  bool _only_merge_candidate;     // Will be true if the object described by this Node is only
-                                  // used as part of a reduced allocation merge.
-
   virtual uint hash() const;
   virtual bool cmp( const Node &n ) const;
 
   uint first_index() const { return _first_index; }
 
 public:
-  SafePointScalarObjectNode(const TypeOopPtr* tp, Node* alloc, uint first_index, uint n_fields, bool only_merge_sr_candidate = false);
+  SafePointScalarObjectNode(const TypeOopPtr* tp, Node* alloc, uint first_index, uint n_fields);
 
   virtual int Opcode() const;
   virtual uint           ideal_reg() const;
@@ -691,8 +688,8 @@ public:
   }
 
   const TypeFunc* tf()         const { return _tf; }
-  const address  entry_point() const { return _entry_point; }
-  const float    cnt()         const { return _cnt; }
+  address  entry_point()       const { return _entry_point; }
+  float    cnt()               const { return _cnt; }
   CallGenerator* generator()   const { return _generator; }
 
   void set_tf(const TypeFunc* tf)       { _tf = tf; }
@@ -1012,7 +1009,7 @@ public:
   // (Note:  This function is defined in file graphKit.cpp, near
   // GraphKit::new_instance/new_array, whose output it recognizes.)
   // The 'ptr' may not have an offset unless the 'offset' argument is given.
-  static AllocateNode* Ideal_allocation(Node* ptr, PhaseValues* phase);
+  static AllocateNode* Ideal_allocation(Node* ptr);
 
   // Fancy version which uses AddPNode::Ideal_base_and_offset to strip
   // an offset, which is reported back to the caller.
@@ -1022,7 +1019,7 @@ public:
 
   // Dig the klass operand out of a (possible) allocation site.
   static Node* Ideal_klass(Node* ptr, PhaseValues* phase) {
-    AllocateNode* allo = Ideal_allocation(ptr, phase);
+    AllocateNode* allo = Ideal_allocation(ptr);
     return (allo == nullptr) ? nullptr : allo->in(KlassNode);
   }
 
@@ -1091,8 +1088,8 @@ public:
 
   // Pattern-match a possible usage of AllocateArrayNode.
   // Return null if no allocation is recognized.
-  static AllocateArrayNode* Ideal_array_allocation(Node* ptr, PhaseValues* phase) {
-    AllocateNode* allo = Ideal_allocation(ptr, phase);
+  static AllocateArrayNode* Ideal_array_allocation(Node* ptr) {
+    AllocateNode* allo = Ideal_allocation(ptr);
     return (allo == nullptr || !allo->is_AllocateArray())
            ? nullptr : allo->as_AllocateArray();
   }

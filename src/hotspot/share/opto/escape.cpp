@@ -499,7 +499,7 @@ BoolTest::mask ConnectionGraph::static_cmpp_result(JavaObjectNode* sr_jobj, Node
 }
 
 // Check if we are able to untangle the merge.
-bool ConnectionGraph::can_reduce_check_users(Node* base, int nesting_level) const {
+bool ConnectionGraph::can_reduce_phi_check_users(Node* base, int nesting_level) const {
   for (DUIterator_Fast imax, i = base->fast_outs(imax); i < imax; i++) {
     Node* use = base->fast_out(i);
 
@@ -554,11 +554,11 @@ bool ConnectionGraph::can_reduce_check_users(Node* base, int nesting_level) cons
         return false;
       }
     } else if (use->is_CastPP()) {
-      if (!can_reduce_check_users(use, nesting_level+1)) {
+      if (!can_reduce_phi_check_users(use, nesting_level+1)) {
         return false;
       }
     } else if (use->is_CheckCastPP()) {
-      if (!can_reduce_check_users(use, nesting_level+1)) {
+      if (!can_reduce_phi_check_users(use, nesting_level+1)) {
         return false;
       }
     } else {
@@ -590,7 +590,7 @@ bool ConnectionGraph::can_reduce_phi(PhiNode* ophi) const {
     return false;
   }
 
-  if (!can_reduce_check_inputs(ophi) || !can_reduce_check_users(ophi)) {
+  if (!can_reduce_phi_check_inputs(ophi) || !can_reduce_phi_check_users(ophi)) {
     return false;
   }
 
@@ -727,7 +727,7 @@ Node* ConnectionGraph::partial_load_split(Node* nsr_load, Node* ophi, Node* cast
   return _igvn->register_new_node_with_optimizer(phi);
 }
 
-void ConnectionGraph::reduce_on_field_access(PhiNode* ophi, GrowableArray<Node *>  &alloc_worklist, GrowableArray<Node *>  &memnode_worklist) {
+void ConnectionGraph::reduce_phi_on_field_access(PhiNode* ophi, GrowableArray<Node *>  &alloc_worklist, GrowableArray<Node *>  &memnode_worklist) {
   // We'll pass this to 'split_through_phi' so that it'll do the split even
   // though the load doesn't have an unique instance type.
   bool ignore_missing_instance_id = true;
@@ -809,111 +809,7 @@ void ConnectionGraph::reduce_on_field_access(PhiNode* ophi, GrowableArray<Node *
 // class header.
 //
 // This method will set entries in the Phi that are scalar replaceable to 'null'.
-void ConnectionGraph::reduce_phi_on_safepoints(PhiNode* ophi, Unique_Node_List* safepoints) {
-  Node* minus_one           = _igvn->register_new_node_with_optimizer(ConINode::make(-1));
-  Node* selector            = _igvn->register_new_node_with_optimizer(PhiNode::make(ophi->region(), minus_one, TypeInt::INT));
-  Node* null_ptr            = _igvn->makecon(TypePtr::NULL_PTR);
-  const TypeOopPtr* merge_t = _igvn->type(ophi)->make_oopptr();
-  uint number_of_sr_objects = 0;
-  PhaseMacroExpand mexp(*_igvn);
-
-  _igvn->hash_delete(ophi);
-
-  // Fill in the 'selector' Phi. If index 'i' of the selector is:
-  // -> a '-1' constant, the i'th input of the original Phi is NSR.
-  // -> a 'x' constant >=0, the i'th input of of original Phi will be SR and the
-  //    info about the scalarized object will be at index x of
-  //    ObjectMergeValue::possible_objects
-  for (uint i = 1; i < ophi->req(); i++) {
-    Node* base          = ophi->in(i);
-    JavaObjectNode* ptn = unique_java_object(base);
-
-    if (ptn != nullptr && ptn->scalar_replaceable()) {
-      Node* sr_obj_idx = _igvn->register_new_node_with_optimizer(ConINode::make(number_of_sr_objects));
-      selector->set_req(i, sr_obj_idx);
-      number_of_sr_objects++;
-    }
-  }
-
-  // Update the debug information of all safepoints in turn
-  for (uint spi = 0; spi < safepoints->size(); spi++) {
-    SafePointNode* sfpt = safepoints->at(spi)->as_SafePoint();
-    JVMState *jvms      = sfpt->jvms();
-    uint merge_idx      = (sfpt->req() - jvms->scloff());
-    int debug_start     = jvms->debug_start();
-
-    SafePointScalarMergeNode* smerge = new SafePointScalarMergeNode(merge_t, merge_idx);
-    smerge->init_req(0, _compile->root());
-    _igvn->register_new_node_with_optimizer(smerge);
-
-    // The next two inputs are:
-    //  (1) A copy of the original pointer to NSR objects.
-    //  (2) A selector, used to decide if we need to rematerialize an object
-    //      or use the pointer to a NSR object.
-    // See more details of these fields in the declaration of SafePointScalarMergeNode
-    sfpt->add_req(uncasted_sfpt_parent);
-    sfpt->add_req(selector);
-
-    for (uint i = 1; i < ophi->req(); i++) {
-      Node* base          = ophi->in(i);
-      JavaObjectNode* ptn = unique_java_object(base);
-
-      // If the base is not scalar replaceable we don't need to register information about
-      // it at this time.
-      if (ptn == nullptr || !ptn->scalar_replaceable()) {
-        continue;
-      }
-
-      AllocateNode* alloc = ptn->ideal_node()->as_Allocate();
-      SafePointScalarObjectNode* sobj = mexp.create_scalarized_object_description(alloc, sfpt);
-      if (sobj == nullptr) {
-        return false;
-      }
-
-      jvms->set_endoff(sfpt->req());
-
-      // Now make a pass over the debug information replacing any references
-      // to the allocated object with "sobj"
-      Node* ccpp = alloc->result_cast();
-      int debug_end = jvms->debug_end();
-      int reps = sfpt->replace_edges_in_range(ccpp, sobj, debug_start, debug_end, _igvn);
-
-      // If the sfpt was NOT using the scalarized object directly then this SOBJ
-      // is just a candidate for rematerialization.
-      if (reps == 0) {
-        sobj->set_only_merge_candidate(true);
-      }
-
-      // Register the scalarized object as a candidate for reallocation
-      smerge->add_req(sobj);
-    }
-
-
-    // Replaces debug information references to "sfpt_parent" in "sfpt" with references to "smerge"
-    int debug_end = jvms->debug_end();
-    sfpt->replace_edges_in_range(original_sfpt_parent, smerge, debug_start, debug_end, _igvn);
-
-    // The call to 'replace_edges_in_range' above might have removed the
-    // reference to ophi that we need at _merge_pointer_idx. The line below make
-    // sure the reference is maintained.
-
-    sfpt->set_req(smerge->merge_pointer_idx(jvms), uncasted_sfpt_parent);
-    _igvn->_worklist.push(sfpt);
-  }
-
-  return true;
-}
-
-// This method will create a SafePointScalarObjectNode for each combination of
-// scalar replaceable allocation in 'ophi' and SafePoint node in 'safepoints'.
-// The method will create a SafePointScalarMERGEnode for each combination of
-// 'ophi' and SafePoint node in 'safepoints'.
-// Each SafePointScalarMergeNode created here may describe multiple scalar
-// replaced objects - check detailed description in SafePointScalarMergeNode
-// class header.
-//
-// This method will set entries in the Phi that are scalar replaceable to 'null'.
-bool ConnectionGraph::reduce_on_safepoints(PhiNode* ophi) {
+bool ConnectionGraph::reduce_phi_on_safepoints(PhiNode* ophi) {
   // All SafePoint nodes using the same Phi node use the same debug
   // information (regarding the Phi). Furthermore, reducing the Phi used by a
   // SafePoint requires changing the Phi. Therefore, I collect all safepoints

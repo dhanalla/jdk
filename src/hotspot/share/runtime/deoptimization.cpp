@@ -292,49 +292,28 @@ JRT_END
 #if COMPILER2_OR_JVMCI
 // print information about reallocated objects
 static void print_objects(JavaThread* deoptee_thread,
-                          GrowableArray<ScopeValue*>* objects, bool realloc_failures,
-                          frame* frame, RegisterMap* reg_map) {
+                          GrowableArray<ScopeValue*>* objects, bool realloc_failures) {
   ResourceMark rm;
   stringStream st;  // change to logStream with logging
   st.print_cr("REALLOC OBJECTS in thread " INTPTR_FORMAT, p2i(deoptee_thread));
   fieldDescriptor fd;
 
   for (int i = 0; i < objects->length(); i++) {
-    ObjectValue* sv = nullptr;
-    Klass* k = nullptr;
-
-    if (objects->at(i)->is_object_merge()) {
-      ObjectMergeValue* merged = objects->at(i)->as_ObjectMergeValue();
-      sv = merged->select(frame, reg_map);
-      // Klass may be null if the object was actually a NSR input of a merge.
-      k = (sv->klass() != nullptr) ? java_lang_Class::as_Klass(sv->klass()->as_ConstantOopReadValue()->value()()) : nullptr;
-    } else if (objects->at(i)->is_object()) {
-      sv = objects->at(i)->as_ObjectValue();
-      // This object is only a candidate inside an ObjectMergeValue
-      if (sv->is_only_merge_candidate()) {
-        continue;
-      }
-      k = java_lang_Class::as_Klass(sv->klass()->as_ConstantOopReadValue()->value()());
-    }
-
+    ObjectValue* sv = (ObjectValue*) objects->at(i);
     Handle obj = sv->value();
 
-    st.print("     object <" INTPTR_FORMAT ">", p2i(sv->value()()));
-    if (k == nullptr) {
-      st.print(" NSR input from an allocation merge.");
-    } else {
-      st.print(" of type ");
-      k->print_value_on(&st);
-    }
-    assert(obj.not_null() || realloc_failures, "reallocation was missed");
     if (obj.is_null()) {
-      st.print(" allocation failed");
-    } else {
-      st.print(" allocated (" SIZE_FORMAT " bytes)", obj->size() * HeapWordSize);
+      st.print_cr("     nullptr");
+      continue;
     }
-    st.cr();
 
-    if (Verbose && !obj.is_null() && k != nullptr) {
+    Klass* k = java_lang_Class::as_Klass(sv->klass()->as_ConstantOopReadValue()->value()());
+
+    st.print("     object <" INTPTR_FORMAT "> of type ", p2i(sv->value()()));
+    k->print_value_on(&st);
+    st.print_cr(" allocated (" SIZE_FORMAT " bytes)", obj->size() * HeapWordSize);
+
+    if (Verbose && k != nullptr) {
       k->oop_print_on(obj(), &st);
     }
   }
@@ -392,7 +371,7 @@ static bool rematerialize_objects(JavaThread* thread, int exec_mode, CompiledMet
     bool skip_internal = (compiled_method != nullptr) && !compiled_method->is_compiled_by_jvmci();
     Deoptimization::reassign_fields(&deoptee, &map, objects, realloc_failures, skip_internal);
     if (TraceDeoptimization) {
-      print_objects(deoptee_thread, objects, realloc_failures, &deoptee, &map);
+      print_objects(deoptee_thread, objects, realloc_failures);
     }
   }
   if (save_oop_result) {

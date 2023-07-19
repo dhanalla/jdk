@@ -2312,7 +2312,6 @@ void Compile::Optimize() {
     bool progress;
     print_method(PHASE_PHASEIDEAL_BEFORE_EA, 2);
     do {
-      print_method(PHASE_PHASEIDEAL_BEFORE_EA, 2);
       ConnectionGraph::do_analysis(this, &igvn);
 
       if (failing())  return;

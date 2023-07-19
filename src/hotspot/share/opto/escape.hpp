@@ -614,9 +614,9 @@ private:
   // -------------------------------------------
   // Methods related to Reduce Allocation Merges
 
-  bool can_reduce(PhiNode* ophi) const;
-  bool can_reduce_check_users(Node* base, int nesting_level = 0) const;
-  bool can_reduce_check_inputs(PhiNode* ophi) const;
+  bool can_reduce_phi(PhiNode* ophi) const;
+  bool can_reduce_phi_check_users(Node* base, int nesting_level = 0) const;
+  bool can_reduce_phi_check_inputs(PhiNode* ophi) const;
 
   void if_on_selector(Node* current_control, Node* selector, Node** yes_sr_control, Node** not_sr_control, Node** selector_if_region);
   BoolTest::mask static_cmpp_result(JavaObjectNode* sr_jobj, Node* other) const;
@@ -631,9 +631,9 @@ private:
   bool reduce_on_sfpt(Node* ophi, Node* cast, Node* selector, Unique_Node_List& safepoints);
   void reduce_on_cast(PhiNode* ophi, Node* selector, Node* castpp, GrowableArray<Node *>  &alloc_worklist, GrowableArray<Node *>  &memnode_worklist);
   void reduce_on_cmp(PhiNode* ophi, Node* selector, Node* cmp);
-  void reduce_on_field_access(PhiNode* ophi, GrowableArray<Node *>  &alloc_worklist, GrowableArray<Node *>  &memnode_worklist);
-  bool reduce_on_safepoints(PhiNode* ophi);
-  void reduce_merge(PhiNode* ophi, GrowableArray<Node *>  &alloc_worklist, GrowableArray<Node *>  &memnode_worklist);
+  void reduce_phi_on_field_access(PhiNode* ophi, GrowableArray<Node *>  &alloc_worklist, GrowableArray<Node *>  &memnode_worklist);
+  bool reduce_phi_on_safepoints(PhiNode* ophi);
+  void reduce_phi(PhiNode* ophi, GrowableArray<Node *>  &alloc_worklist, GrowableArray<Node *>  &memnode_worklist);
 
   void set_not_scalar_replaceable(PointsToNode* ptn NOT_PRODUCT(COMMA const char* reason)) const {
 #ifndef PRODUCT

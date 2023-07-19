@@ -1210,33 +1210,7 @@ bool Deoptimization::realloc_objects(JavaThread* thread, frame* fr, RegisterMap*
 
   for (int i = 0; i < objects->length(); i++) {
     assert(objects->at(i)->is_object(), "invalid debug information");
-    ObjectValue* sv = nullptr;
-
-    if (objects->at(i)->is_object_merge()) {
-      ObjectMergeValue* merged = objects->at(i)->as_ObjectMergeValue();
-      sv = merged->select(fr, reg_map);
-
-      // 'skip_rematerialization' will be true whenever the object was a NSR
-      // input of an allocation merge.
-      // 'value' will be not null if the object selected in the merge was a
-      // 'not_only_candidate' and it was visited by this loop before the current
-      // iteration.
-      if (sv->skip_rematerialization() || sv->value().not_null()) {
-        continue;
-      }
-    } else if (objects->at(i)->is_object()) {
-      sv = objects->at(i)->as_ObjectValue();
-
-      // We skip allocation if the object is only a candidate inside an
-      // ObjectMergeValue or if it already has an allocation. The object may
-      // already be allocated if it was the result of a 'select' on an
-      // ObjectMergeValue.
-      if (sv->is_only_merge_candidate() || sv->value().not_null()) {
-        continue;
-      }
-    } else {
-      assert(false, "sanity");
-    }
+    ObjectValue* sv = (ObjectValue*) objects->at(i);
 
     Klass* k = java_lang_Class::as_Klass(sv->klass()->as_ConstantOopReadValue()->value()());
     oop obj = nullptr;

@@ -1528,14 +1528,13 @@ static bool stable_phi(PhiNode* phi, PhaseGVN *phase) {
 //  - If base->is_CastPP() or base->is_CheckCastPP(): base = base->in(1)
 bool LoadNode::can_split_through_phi_base(PhaseGVN* phase) {
   Node* mem        = in(Memory);
+  Node* address = in(Address);
   intptr_t ignore  = 0;
-  Node*    base    = AddPNode::Ideal_base_and_offset(in(Address), phase, ignore);
+  Node*    base    = AddPNode::Ideal_base_and_offset(address, phase, ignore);
            base    = (base->is_CastPP() || base->is_CheckCastPP()) ? base->in(1) : base;
+  bool base_is_phi = (base != nullptr) && base->is_Phi();
 
-  // LoadVector subclasses such as LoadVectorMasked have extra inputs that the
-  // split logic doesn't take into account. Naturally, we also don't split
-  // through the base if the base is not a Phi node.
-  if (req() > 3 || base == nullptr || !base->is_Phi()) {
+  if (req() > 3 || !base_is_phi) {
     return false;
   }
 

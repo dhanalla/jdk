@@ -412,7 +412,7 @@ bool ConnectionGraph::compute_escape() {
       Node* n = reducible_merges.at(i);
 
       if (n->outcnt() > 0) {
-        if (!reduce_on_safepoints(n->as_Phi())) {
+        if (!reduce_phi_on_safepoints(n->as_Phi())) {
           C->record_failure(C2Compiler::retry_no_reduce_allocation_merges());
           return false;
         }
@@ -800,6 +800,89 @@ void ConnectionGraph::reduce_phi_on_field_access(PhiNode* ophi, GrowableArray<No
   }
 }
 
+bool ConnectionGraph::reduce_phi_on_sfpt(Node* ophi, Node* cast, Node* selector, Unique_Node_List& safepoints) {
+  if (safepoints.size() == 0) {
+    return true;
+  }
+
+  // Update the debug information of all safepoints in turn
+  PhaseMacroExpand mexp(*_igvn);
+  Node* original_sfpt_parent =  cast != nullptr ? cast : ophi;
+  const TypeOopPtr* merge_t = _igvn->type(original_sfpt_parent)->make_oopptr();
+
+  Node* uncasted_sfpt_parent = ophi;
+  if (cast != nullptr && (cast->is_CastPP() || cast->is_CheckCastPP())) {
+    const Type* new_t    = merge_t->meet(TypePtr::NULL_PTR);
+    if (new_t == _igvn->type(cast->in(1))) {
+      uncasted_sfpt_parent = cast->in(1);
+    } else {
+      uncasted_sfpt_parent = cast->clone();
+      uncasted_sfpt_parent->as_ConstraintCast()->set_type(new_t);
+      //_igvn->set_type(uncasted_sfpt_parent, new_t);
+      _igvn->transform(uncasted_sfpt_parent);
+    }
+  }
+
+  for (uint spi = 0; spi < safepoints.size(); spi++) {
+    SafePointNode* sfpt = safepoints.at(spi)->as_SafePoint();
+    JVMState *jvms      = sfpt->jvms();
+    uint merge_idx      = (sfpt->req() - jvms->scloff());
+    int debug_start     = jvms->debug_start();
+
+    SafePointScalarMergeNode* smerge = new SafePointScalarMergeNode(merge_t, merge_idx);
+    smerge->init_req(0, _compile->root());
+    _igvn->register_new_node_with_optimizer(smerge);
+
+    // The next two inputs are:
+    //  (1) A copy of the original pointer to NSR objects.
+    //  (2) A selector, used to decide if we need to rematerialize an object
+    //      or use the pointer to a NSR object.
+    // See more details of these fields in the declaration of SafePointScalarMergeNode
+    sfpt->add_req(uncasted_sfpt_parent);
+    sfpt->add_req(selector);
+
+    for (uint i = 1; i < ophi->req(); i++) {
+      Node* base          = ophi->in(i);
+      JavaObjectNode* ptn = unique_java_object(base);
+
+      // If the base is not scalar replaceable we don't need to register information about
+      // it at this time.
+      if (ptn == nullptr || !ptn->scalar_replaceable()) {
+        continue;
+      }
+
+      AllocateNode* alloc = ptn->ideal_node()->as_Allocate();
+      SafePointScalarObjectNode* sobj = mexp.create_scalarized_object_description(alloc, sfpt);
+      if (sobj == nullptr) {
+        return false;
+      }
+
+      jvms->set_endoff(sfpt->req());
+
+      // Now make a pass over the debug information replacing any references
+      // to the allocated object with "sobj"
+      Node* ccpp = alloc->result_cast();
+      int debug_end = jvms->debug_end();
+      int reps = sfpt->replace_edges_in_range(ccpp, sobj, debug_start, debug_end, _igvn);
+
+      // Register the scalarized object as a candidate for reallocation
+      smerge->add_req(sobj);
+    }
+
+    // Replaces debug information references to "sfpt_parent" in "sfpt" with references to "smerge"
+    int debug_end = jvms->debug_end();
+    sfpt->replace_edges_in_range(original_sfpt_parent, smerge, debug_start, debug_end, _igvn);
+
+    // The call to 'replace_edges_in_range' above might have removed the
+    // reference to ophi that we need at _merge_pointer_idx. The line below make
+    // sure the reference is maintained.
+    sfpt->set_req(smerge->merge_pointer_idx(jvms), uncasted_sfpt_parent);
+    _igvn->_worklist.push(sfpt);
+  }
+
+  return true;
+}
+
 // This method will create a SafePointScalarObjectNode for each combination of
 // scalar replaceable allocation in 'ophi' and SafePoint node in 'safepoints'.
 // The method will create a SafePointScalarMERGEnode for each combination of
@@ -833,13 +916,13 @@ bool ConnectionGraph::reduce_phi_on_safepoints(PhiNode* ophi) {
         }
       }
 
-      if (!reduce_on_sfpt(ophi, use, selector, child_sfpts)) {
+      if (!reduce_phi_on_sfpt(ophi, use, selector, child_sfpts)) {
         return false;
       }
     }
   }
 
-  return reduce_on_sfpt(ophi, nullptr, selector, safepoints);
+  return reduce_phi_on_sfpt(ophi, nullptr, selector, safepoints);
 }
 
 void ConnectionGraph::reduce_on_cmp(PhiNode* ophi, Node* selector, Node* cmp) {
@@ -1058,7 +1141,7 @@ void ConnectionGraph::reduce_merge(PhiNode* ophi, GrowableArray<Node *>  &alloc_
   _igvn->set_delay_transform(true);
   _igvn->hash_delete(ophi);
 
-  reduce_on_field_access(ophi, alloc_worklist, memnode_worklist);
+  reduce_phi_on_field_access(ophi, alloc_worklist, memnode_worklist);
 
   for (DUIterator_Fast imax, i = ophi->fast_outs(imax); i < imax; i++) {
     Node* use = ophi->fast_out(i);
@@ -2649,8 +2732,7 @@ void ConnectionGraph::adjust_scalar_replaceable_state(JavaObjectNode* jobj, Uniq
           continue;
         }
 
-        if (ReduceAllocationMerges && use_n->is_Phi() && can_reduce(use_n->as_Phi())) {
-
+        if (ReduceAllocationMerges && use_n->is_Phi() && can_reduce_phi(use_n->as_Phi())) {
           candidates.push(use_n);
         } else {
           // Mark all objects as NSR if we can't remove the merge
@@ -2731,21 +2813,21 @@ void ConnectionGraph::adjust_scalar_replaceable_state(JavaObjectNode* jobj, Uniq
       }
 
       if (further_validate) {
-
-      for (BaseIterator i(field); i.has_next(); i.next()) {
-        PointsToNode* base = i.get();
-        // Don't take into account LocalVar nodes which
-        // may point to only one object which should be also
-        // this field's base by now.
-        if (base->is_JavaObject() && base != jobj) {
-          // Mark all bases.
-          set_not_scalar_replaceable(jobj NOT_PRODUCT(COMMA "may point to more than one object"));
-          set_not_scalar_replaceable(base NOT_PRODUCT(COMMA "may point to more than one object"));
+        for (BaseIterator i(field); i.has_next(); i.next()) {
+          PointsToNode* base = i.get();
+          // Don't take into account LocalVar nodes which
+          // may point to only one object which should be also
+          // this field's base by now.
+          if (base->is_JavaObject() && base != jobj) {
+            // Mark all bases.
+            set_not_scalar_replaceable(jobj NOT_PRODUCT(COMMA "may point to more than one object"));
+            set_not_scalar_replaceable(base NOT_PRODUCT(COMMA "may point to more than one object"));
+          }
         }
-      }
 
-      if (!jobj->scalar_replaceable()) {
-        return;
+        if (!jobj->scalar_replaceable()) {
+          return;
+        }
       }
     }
   }

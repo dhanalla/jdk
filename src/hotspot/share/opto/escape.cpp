@@ -321,6 +321,19 @@ bool ConnectionGraph::compute_escape() {
   // an unique instance type.
   for (uint i = 0; i < reducible_merges.size(); i++ ) {
     Node* n = reducible_merges.at(i);
+    if (alloc_worklist.contains(n))
+     continue;
+    // make sure child phi will be processed before parent phi in a nested phi scenario
+    if (n->is_Phi()) {
+     for (uint j = 1; j < n->req(); j++) {
+       Node *parent = n->in(j);
+       if (parent->is_Phi() && reducible_merges.member(parent) && !alloc_worklist.contains(parent)) {
+        // list is processed in reverse order, add parent phi before child phi
+        alloc_worklist.append(parent);
+        tty->print_cr("***reorder nested phi nodes in worklist***");
+       }
+      }
+     }
     alloc_worklist.append(n);
   }
 

@@ -594,7 +594,7 @@ private:
   bool can_reduce_phi_check_users(Node* base, int nesting_level = 0) const;
   bool can_reduce_phi_check_inputs(PhiNode* ophi) const;
 
-  bool has_reducible_merge_base(Node* n, Unique_Node_List &reducible_merges);
+  bool has_reducible_merge_base(AddPNode* n, Unique_Node_List &reducible_merges);
   void if_on_selector(Node* current_control, Node* selector, Node** yes_sr_control, Node** not_sr_control, Node** selector_if_region);
   BoolTest::mask static_cmpp_result(JavaObjectNode* sr_jobj, Node* other) const;
   void reset_merge_entries(PhiNode* ophi);

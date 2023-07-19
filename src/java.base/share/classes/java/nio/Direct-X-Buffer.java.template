@@ -487,14 +487,14 @@ class Direct$Type$Buffer$RW$$BO$
 #end[rw] 
 
     public $Type$Buffer append(CharSequence csq) {
-#if[rw]
-        if (csq instanceof StringBuilder)
+#if[rw] 
+        if (csq instanceof StringBuilder) 
             return appendChars(csq, 0, csq.length());
-
+ 
         return super.append(csq);
-#else[rw] 
+#else[rw]
         throw new ReadOnlyBufferException();
-#end[rw] 
+#end[rw]
     }
  
     public $Type$Buffer append(CharSequence csq, int start, int end) { 

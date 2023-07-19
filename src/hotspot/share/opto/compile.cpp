@@ -2302,7 +2302,6 @@ void Compile::Optimize() {
   remove_root_to_sfpts_edges(igvn);
 
   // Perform escape analysis
-  int counter = 0;
   if (do_escape_analysis() && ConnectionGraph::has_candidates(this)) {
     if (has_loops()) {
       // Cleanup graph (remove dead nodes).
@@ -2313,11 +2312,8 @@ void Compile::Optimize() {
     bool progress;
     print_method(PHASE_PHASEIDEAL_BEFORE_EA, 2);
     do {
-      save_graph(this, "before_do_analysis");
       print_method(PHASE_PHASEIDEAL_BEFORE_EA, 2);
       ConnectionGraph::do_analysis(this, &igvn);
-
-      save_graph(this, "after_do_analysis");
 
       if (failing())  return;
 
@@ -2325,7 +2321,6 @@ void Compile::Optimize() {
 
       // Optimize out fields loads from scalar replaceable allocations.
       igvn.optimize();
-      //save_graph(this, "after_first_optimize");
       print_method(PHASE_ITER_GVN_AFTER_EA, 2);
 
       if (failing())  return;
@@ -2334,11 +2329,9 @@ void Compile::Optimize() {
         TracePhase tp("macroEliminate", &timers[_t_macroEliminate]);
         PhaseMacroExpand mexp(igvn);
         mexp.eliminate_macro_nodes();
-        //save_graph(this, "after_eliminate");
         igvn.set_delay_transform(false);
 
         igvn.optimize();
-        //save_graph(this, "after_second_optimize");
         print_method(PHASE_ITER_GVN_AFTER_ELIMINATION, 2);
       }
 

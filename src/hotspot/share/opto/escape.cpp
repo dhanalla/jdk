@@ -474,6 +474,30 @@ bool ConnectionGraph::can_reduce_phi_check_inputs(PhiNode* ophi) const {
   return found_sr_allocate;
 }
 
+bool ConnectionGraph::has_reducible_merge_base(Node* n, Unique_Node_List &reducible_merges) {
+  PointsToNode* ptn = ptnode_adr(n->_idx);
+  if (ptn == nullptr || !ptn->is_Field() || ptn->as_Field()->base_count() < 2) {
+    return false;
+  }
+
+  for (BaseIterator i(ptn->as_Field()); i.has_next(); i.next()) {
+    Node* base = i.get()->ideal_node();
+
+    if (reducible_merges.member(base)) {
+      return true;
+    }
+
+    if (base->is_CastPP() || base->is_CheckCastPP()) {
+      base = base->in(1);
+      if (reducible_merges.member(base)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 // Checks if 'other' can point to the Allocate object pointed by 'sr_jobj'.
 // 'sr_jobj' is a scalar replaceable Object allocation, so we can leverage that
 // info to help decide the result of the comparison at compile time in some

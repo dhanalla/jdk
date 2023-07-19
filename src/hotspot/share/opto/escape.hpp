@@ -530,30 +530,6 @@ private:
     return is_new;
   }
 
-  bool has_reducible_merge_base(Node* n, Unique_Node_List &reducible_merges) {
-    PointsToNode* ptn = ptnode_adr(n->_idx);
-    if (ptn == nullptr || !ptn->is_Field() || ptn->as_Field()->base_count() < 2) {
-      return false;
-    }
-
-    for (BaseIterator i(ptn->as_Field()); i.has_next(); i.next()) {
-      Node* base = i.get()->ideal_node();
-
-      if (reducible_merges.member(base)) {
-        return true;
-      }
-
-      if (base->is_CastPP() || base->is_CheckCastPP()) {
-        base = base->in(1);
-        if (reducible_merges.member(base)) {
-          return true;
-        }
-      }
-    }
-
-    return false;
-  }
-
   // Helper functions
   bool   is_oop_field(Node* n, int offset, bool* unsafe);
   static Node* find_second_addp(Node* addp, Node* n);
@@ -618,6 +594,7 @@ private:
   bool can_reduce_phi_check_users(Node* base, int nesting_level = 0) const;
   bool can_reduce_phi_check_inputs(PhiNode* ophi) const;
 
+  bool has_reducible_merge_base(Node* n, Unique_Node_List &reducible_merges);
   void if_on_selector(Node* current_control, Node* selector, Node** yes_sr_control, Node** not_sr_control, Node** selector_if_region);
   BoolTest::mask static_cmpp_result(JavaObjectNode* sr_jobj, Node* other) const;
   void collect_loads(Node* base, Unique_Node_List& loads);

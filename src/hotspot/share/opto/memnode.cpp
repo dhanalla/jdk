@@ -1528,7 +1528,7 @@ static bool stable_phi(PhiNode* phi, PhaseGVN *phase) {
 //  - If base->is_CastPP() or base->is_CheckCastPP(): base = base->in(1)
 bool LoadNode::can_split_through_phi_base(PhaseGVN* phase) {
   Node* mem        = in(Memory);
-  Node* address = in(Address);
+  Node* address    = in(Address);
   intptr_t ignore  = 0;
   Node*    base    = AddPNode::Ideal_base_and_offset(address, phase, ignore);
            base    = (base->is_CastPP() || base->is_CheckCastPP()) ? base->in(1) : base;

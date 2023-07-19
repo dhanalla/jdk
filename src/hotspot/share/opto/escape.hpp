@@ -608,7 +608,7 @@ private:
   bool reduce_phi_on_sfpt(Node* ophi, Node* cast, Node* selector, Unique_Node_List& safepoints);
   void reduce_on_cast(PhiNode* ophi, Node* selector, Node* castpp, GrowableArray<Node *>  &alloc_worklist, GrowableArray<Node *>  &memnode_worklist);
   void reduce_on_cmp(PhiNode* ophi, Node* selector, Node* cmp);
-  void reduce_phi_on_field_access(PhiNode* ophi, GrowableArray<Node *>  &alloc_worklist, GrowableArray<Node *>  &memnode_worklist);
+  void reduce_phi_on_field_access(PhiNode* ophi, GrowableArray<Node *>  &alloc_worklist);
   bool reduce_phi_on_safepoints(PhiNode* ophi);
 
   void set_not_scalar_replaceable(PointsToNode* ptn NOT_PRODUCT(COMMA const char* reason)) const {

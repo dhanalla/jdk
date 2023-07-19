@@ -619,7 +619,7 @@ bool ConnectionGraph::can_reduce_phi(PhiNode* ophi) const {
   return true;
 }
 
-void ConnectionGraph::reduce_phi_on_field_access(PhiNode* ophi, GrowableArray<Node *>  &alloc_worklist, GrowableArray<Node *>  &memnode_worklist) {
+void ConnectionGraph::reduce_phi_on_field_access(PhiNode* ophi, GrowableArray<Node *>  &alloc_worklist) {
   // We'll pass this to 'split_through_phi' so that it'll do the split even
   // though the load doesn't have an unique instance type.
   bool ignore_missing_instance_id = true;
@@ -690,123 +690,6 @@ void ConnectionGraph::reduce_phi_on_field_access(PhiNode* ophi, GrowableArray<No
     j -= num_edges;
     j = MIN2(j, (int)ophi->outcnt()-1);
   }
-}
-
-void ConnectionGraph::update_after_load_split(PhiNode* data_phi, AddPNode* previous_addp, LoadNode* previous_load,
-                                              GrowableArray<Node *>  &alloc_worklist,
-                                              GrowableArray<Node *>  &memnode_worklist) {
-  alloc_worklist.remove_if_existing(previous_addp);
-  memnode_worklist.remove_if_existing(previous_load);
-
-  // Push the newly created AddP+Load on alloc/memnode_worklist and patch the
-  // connection graph. Note that the changes in the CG below won't affect the
-  // ES of objects since the new nodes have the same status as the old ones.
-  for (uint i = 1; i < data_phi->req(); i++) {
-    Node *new_load = data_phi->in(i);
-    if (new_load->is_Load()) {
-      FieldNode *field_node = ptnode_adr(previous_addp->_idx)->as_Field();
-      Node *new_addp = new_load->in(MemNode::Address);
-      Node *base = get_addp_base(new_addp);
-
-      // If the base wasn't in the connection graph then we created it during
-      // the reduction process. If that's the case then it's a NoEscape base
-      // and we need to add it's edge at least to it's parent right now. We
-      // then push it to alloc_worklist so that the field loads from it will
-      // be processed in split_unique_types later on.
-      _nodes.at_grow(base->_idx, nullptr);
-      if (base->is_ConstraintCast() && _nodes.at(base->_idx) == nullptr) {
-        PointsToNode *jobj_ptn = unique_java_object(base->in(1));
-        if (jobj_ptn == nullptr || !jobj_ptn->scalar_replaceable()) {
-          continue;
-        }
-
-        add_local_var(base, PointsToNode::NoEscape);
-        add_edge(ptnode_adr(base->_idx), ptnode_adr(base->in(1)->_idx));
-        add_edge(ptnode_adr(base->_idx), jobj_ptn);
-
-        alloc_worklist.append_if_missing(base);
-
-        // For this case we don't push the addp/load on the worklists
-        // because they'll be pushed when the base is processed by split_unique_types.
-      } else {
-        // The base might not be something that we can create an unique
-        // type for. If that's the case we are done with that input.
-        PointsToNode *jobj_ptn = unique_java_object(base);
-        if (jobj_ptn == nullptr || !jobj_ptn->scalar_replaceable()) {
-          continue;
-        }
-
-        // Push to alloc/memnode_worklist since the base has an unique_type
-        alloc_worklist.append_if_missing(new_addp);
-        memnode_worklist.append_if_missing(new_load);
-      }
-
-      // Now let's add the node to the connection graph
-      _nodes.at_grow(new_addp->_idx, nullptr);
-      add_field(new_addp, field_node->escape_state(), field_node->offset());
-      add_base(ptnode_adr(new_addp->_idx)->as_Field(), ptnode_adr(base->_idx));
-
-      // If the load doesn't load an object then it won't be
-      // part of the connection graph
-      PointsToNode *curr_load_ptn = ptnode_adr(previous_load->_idx);
-      if (curr_load_ptn != nullptr) {
-        _nodes.at_grow(new_load->_idx, nullptr);
-        add_local_var(new_load, curr_load_ptn->escape_state());
-        add_edge(ptnode_adr(new_load->_idx), ptnode_adr(new_addp->_idx)->as_Field());
-      }
-    }
-  }
-}
-
-Node* ConnectionGraph::partial_load_split(Node* nsr_load, Node* ophi, Node* cast, Node* selector) {
-  Node* address         = nsr_load->in(LoadNode::Address);
-  Node* memory          = nsr_load->in(LoadNode::Memory);
-  const Type* load_type = nsr_load->bottom_type();
-  bool is_castpp        = cast != nullptr && cast->is_CastPP();
-  bool is_ccpp          = cast != nullptr && cast->is_CheckCastPP();
-  Node* nsr_value       = _igvn->zerocon(load_type->basic_type());
-  Node* region          = ophi->in(0);
-  Node* phi             = PhiNode::make(region, nsr_value, load_type);
-
-  for (uint i = 1; i < selector->req(); i++) {
-    Node* in = region->in(i);
-    Node* sel_in = selector->in(i);
-
-    if (sel_in->as_ConI()->get_int() == -1) {
-      // Skip cloning load for this entry because it's a NSR input in the base
-      continue;
-    }
-
-    if (region->is_CountedLoop() && region->as_Loop()->is_strip_mined() && i == LoopNode::EntryControl &&
-        in != nullptr && in->is_OuterStripMinedLoop()) {
-      // No node should go in the outer strip mined loop
-      in = in->in(LoopNode::EntryControl);
-    }
-
-    Node* base_for_sr_load = ophi->in(i); // Clone address for loads from boxed objects.
-
-    if (is_castpp || is_ccpp) {
-      base_for_sr_load = _igvn->transform(cast->clone());
-      base_for_sr_load->set_req(0, nullptr);
-      base_for_sr_load->set_req(1, ophi->in(i));
-    }
-
-    Node* sr_load_addr = _igvn->transform(new AddPNode(base_for_sr_load, base_for_sr_load, address->in(AddPNode::Offset)));
-    Node* sr_load = nsr_load->clone();
-
-    sr_load->set_req(LoadNode::Control, nullptr);
-    sr_load->set_req(LoadNode::Address, sr_load_addr);
-    sr_load->set_req(LoadNode::Memory, (memory->is_Phi() && (memory->in(0) == region)) ? memory->in(i) : memory);
-
-    const Type *t = sr_load->Value(_igvn);
-    _igvn->set_type(sr_load, t);
-    sr_load->raise_bottom_type(t);
-    _igvn->_worklist.push(sr_load);
-
-    phi->set_req(i, sr_load);
-  }
-
-  return _igvn->register_new_node_with_optimizer(phi);
 }
 
 // This method will create a SafePointScalarObjectNode for each combination of
@@ -932,6 +815,123 @@ bool ConnectionGraph::reduce_phi_on_sfpt(Node* ophi, Node* cast, Node* selector,
   }
 
   return true;
+}
+
+void ConnectionGraph::update_after_load_split(PhiNode* data_phi, AddPNode* previous_addp, LoadNode* previous_load,
+                                              GrowableArray<Node *>  &alloc_worklist,
+                                              GrowableArray<Node *>  &memnode_worklist) {
+  alloc_worklist.remove_if_existing(previous_addp);
+  memnode_worklist.remove_if_existing(previous_load);
+
+  // Push the newly created AddP+Load on alloc/memnode_worklist and patch the
+  // connection graph. Note that the changes in the CG below won't affect the
+  // ES of objects since the new nodes have the same status as the old ones.
+  for (uint i = 1; i < data_phi->req(); i++) {
+    Node *new_load = data_phi->in(i);
+    if (new_load->is_Load()) {
+      FieldNode *field_node = ptnode_adr(previous_addp->_idx)->as_Field();
+      Node *new_addp = new_load->in(MemNode::Address);
+      Node *base = get_addp_base(new_addp);
+
+      // If the base wasn't in the connection graph then we created it during
+      // the reduction process. If that's the case then it's a NoEscape base
+      // and we need to add it's edge at least to it's parent right now. We
+      // then push it to alloc_worklist so that the field loads from it will
+      // be processed in split_unique_types later on.
+      _nodes.at_grow(base->_idx, nullptr);
+      if (base->is_ConstraintCast() && _nodes.at(base->_idx) == nullptr) {
+        PointsToNode *jobj_ptn = unique_java_object(base->in(1));
+        if (jobj_ptn == nullptr || !jobj_ptn->scalar_replaceable()) {
+          continue;
+        }
+
+        add_local_var(base, PointsToNode::NoEscape);
+        add_edge(ptnode_adr(base->_idx), ptnode_adr(base->in(1)->_idx));
+        add_edge(ptnode_adr(base->_idx), jobj_ptn);
+
+        alloc_worklist.append_if_missing(base);
+
+        // For this case we don't push the addp/load on the worklists
+        // because they'll be pushed when the base is processed by split_unique_types.
+      } else {
+        // The base might not be something that we can create an unique
+        // type for. If that's the case we are done with that input.
+        PointsToNode *jobj_ptn = unique_java_object(base);
+        if (jobj_ptn == nullptr || !jobj_ptn->scalar_replaceable()) {
+          continue;
+        }
+
+        // Push to alloc/memnode_worklist since the base has an unique_type
+        alloc_worklist.append_if_missing(new_addp);
+        memnode_worklist.append_if_missing(new_load);
+      }
+
+      // Now let's add the node to the connection graph
+      _nodes.at_grow(new_addp->_idx, nullptr);
+      add_field(new_addp, field_node->escape_state(), field_node->offset());
+      add_base(ptnode_adr(new_addp->_idx)->as_Field(), ptnode_adr(base->_idx));
+
+      // If the load doesn't load an object then it won't be
+      // part of the connection graph
+      PointsToNode *curr_load_ptn = ptnode_adr(previous_load->_idx);
+      if (curr_load_ptn != nullptr) {
+        _nodes.at_grow(new_load->_idx, nullptr);
+        add_local_var(new_load, curr_load_ptn->escape_state());
+        add_edge(ptnode_adr(new_load->_idx), ptnode_adr(new_addp->_idx)->as_Field());
+      }
+    }
+  }
+}
+
+Node* ConnectionGraph::partial_load_split(Node* nsr_load, Node* ophi, Node* cast, Node* selector) {
+  Node* address         = nsr_load->in(LoadNode::Address);
+  Node* memory          = nsr_load->in(LoadNode::Memory);
+  const Type* load_type = nsr_load->bottom_type();
+  bool is_castpp        = cast != nullptr && cast->is_CastPP();
+  bool is_ccpp          = cast != nullptr && cast->is_CheckCastPP();
+  Node* nsr_value       = _igvn->zerocon(load_type->basic_type());
+  Node* region          = ophi->in(0);
+  Node* phi             = PhiNode::make(region, nsr_value, load_type);
+
+  for (uint i = 1; i < selector->req(); i++) {
+    Node* in = region->in(i);
+    Node* sel_in = selector->in(i);
+
+    if (sel_in->as_ConI()->get_int() == -1) {
+      // Skip cloning load for this entry because it's a NSR input in the base
+      continue;
+    }
+
+    if (region->is_CountedLoop() && region->as_Loop()->is_strip_mined() && i == LoopNode::EntryControl &&
+        in != nullptr && in->is_OuterStripMinedLoop()) {
+      // No node should go in the outer strip mined loop
+      in = in->in(LoopNode::EntryControl);
+    }
+
+    Node* base_for_sr_load = ophi->in(i); // Clone address for loads from boxed objects.
+
+    if (is_castpp || is_ccpp) {
+      base_for_sr_load = _igvn->transform(cast->clone());
+      base_for_sr_load->set_req(0, nullptr);
+      base_for_sr_load->set_req(1, ophi->in(i));
+    }
+
+    Node* sr_load_addr = _igvn->transform(new AddPNode(base_for_sr_load, base_for_sr_load, address->in(AddPNode::Offset)));
+    Node* sr_load = nsr_load->clone();
+
+    sr_load->set_req(LoadNode::Control, nullptr);
+    sr_load->set_req(LoadNode::Address, sr_load_addr);
+    sr_load->set_req(LoadNode::Memory, (memory->is_Phi() && (memory->in(0) == region)) ? memory->in(i) : memory);
+
+    const Type *t = sr_load->Value(_igvn);
+    _igvn->set_type(sr_load, t);
+    sr_load->raise_bottom_type(t);
+    _igvn->_worklist.push(sr_load);
+
+    phi->set_req(i, sr_load);
+  }
+
+  return _igvn->register_new_node_with_optimizer(phi);
 }
 
 void ConnectionGraph::reduce_on_cmp(PhiNode* ophi, Node* selector, Node* cmp) {

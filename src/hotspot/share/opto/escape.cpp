@@ -4206,7 +4206,6 @@ void ConnectionGraph::split_unique_types(GrowableArray<Node *>  &alloc_worklist,
         continue;
       }
       Node* addp_base = get_addp_base(n);
-
       JavaObjectNode* jobj = unique_java_object(addp_base);
       if (jobj == nullptr || jobj == phantom_obj) {
 #ifdef ASSERT
@@ -4223,7 +4222,7 @@ void ConnectionGraph::split_unique_types(GrowableArray<Node *>  &alloc_worklist,
                n->is_CheckCastPP() ||
                n->is_EncodeP() ||
                n->is_DecodeN() ||
-               n->is_CastPP()) {
+               (n->is_ConstraintCast() && n->Opcode() == Op_CastPP)) {
       if (visited.test_set(n->_idx)) {
         assert(n->is_Phi(), "loops only through Phi's");
         continue;  // already processed
@@ -4235,8 +4234,8 @@ void ConnectionGraph::split_unique_types(GrowableArray<Node *>  &alloc_worklist,
         reduce_merge(n->as_Phi(), alloc_worklist, memnode_worklist);
         continue;
       } else if (reducible_merges.member(parent)) {
-        // 'n' is a child of a reducible merge (a Phi). It'll
-        // be simplified as part of reduce_merge.
+        // 'n' is an user of a reducible merge (a Phi). It will be simplified as
+        // part of reduce_merge.
         continue;
       }
       JavaObjectNode* jobj = unique_java_object(n);
@@ -4345,6 +4344,7 @@ void ConnectionGraph::split_unique_types(GrowableArray<Node *>  &alloc_worklist,
 #endif
       }
     }
+
   }
 
   // Go over all ArrayCopy nodes and if one of the inputs has a unique

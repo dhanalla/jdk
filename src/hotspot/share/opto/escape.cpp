@@ -470,39 +470,47 @@ bool ConnectionGraph::can_reduce_phi_check_inputs(PhiNode* ophi) const {
   return found_sr_allocate;
 }
 
-// Check if we are able to untangle the merge.
+// Check if we are able to untangle the merge. This is a recursive method. The
+// supported use patterns of Phis are the following:
+// Phi -> AddP -> LoadX
+// Phi -> SafePoint
+// Phi -> CmpP/N
+// Phi -> CastPP
+//           -> AddP -> LoadX
+//           -> SafePoint
+// Phi -> CastPP
+//           -> AddP -> LoadX
+//           -> SafePoint
 bool ConnectionGraph::can_reduce_phi_check_users(Node* base, int nesting_level) const {
   for (DUIterator_Fast imax, i = base->fast_outs(imax); i < imax; i++) {
     Node* use = base->fast_out(i);
 
     if (use->is_SafePoint()) {
       if (use->is_Call() && use->as_Call()->has_non_debug_use(base)) {
-        NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce Phi %d on invocation %d. Call has non_debug_use().", base->_idx, _invocation);)
+        NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce because %s at nesting level %d has Call with non_debug_use().", base->Name(), nesting_level);)
         return false;
       }
     } else if (use->is_AddP()) {
-      Node* addp = use;
-
-      if (addp->in(AddPNode::Offset)->find_intptr_t_con(-1) == -1) {
-        NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce Phi. AddP offset is not a constant offset.");)
+      if (use->in(AddPNode::Offset)->find_intptr_t_con(-1) == -1) {
+        NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce because AddP's offset at nesting level %d is not constant.", nesting_level);)
         return false;
       }
 
-      for (DUIterator_Fast jmax, j = addp->fast_outs(jmax); j < jmax; j++) {
-        Node* addp_use = addp->fast_out(j);
-        if (!addp_use->is_Load()) {
-          NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce Phi %d on invocation %d. AddP user isn't a Load.", base->_idx, _invocation);)
+      for (DUIterator_Fast jmax, j = use->fast_outs(jmax); j < jmax; j++) {
+        Node* use_use = use->fast_out(j);
+        if (!use_use->is_Load()) {
+          NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce because AddP user at nesting level %d is not a Load, it's a %s", nesting_level, use_use->Name());)
           return false;
-        } else if (!addp_use->as_Load()->can_split_through_phi_base(_igvn)) {
-          NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce Phi %d on invocation %d. AddP.Load isn't splittable.", base->_idx, _invocation);)
+        } else if (!use_use->as_Load()->can_split_through_phi_base(_igvn)) {
+          NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce because AddP.Load at nesting level %d is not splittable.", nesting_level);)
           return false;
-        } else if (addp_use->as_Load()->control_dependency() != LoadNode::ControlDependency::DependsOnlyOnTest) {
-          NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce Phi. %s.AddP.LoadN NOT depends only on test.", use->Name());)
+        } else if (use_use->as_Load()->control_dependency() != LoadNode::ControlDependency::DependsOnlyOnTest) {
+          NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce because AddP.Load at nesting level %d NOT depends only on test.", nesting_level);)
           return false;
         }
       }
     } else if (nesting_level > 0) {
-      NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce Phi %d on invocation %d. One of the uses is: %d %s", base->_idx, _invocation, use->_idx, use->Name());)
+      NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce because one of the uses at nesting level %d is a %s", nesting_level, use->Name());)
       return false;
     } else if (use->Opcode() == Op_CmpP || use->Opcode() == Op_CmpN) {
       Node* other = (use->in(1) == base) ? use->in(2) : use->in(1);
@@ -522,19 +530,15 @@ bool ConnectionGraph::can_reduce_phi_check_users(Node* base, int nesting_level) 
       }
 
       if (!can_prove) {
-        NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce Phi %d on invocation %d. Cannot prove result of CmpP/N.", base->_idx, _invocation);)
+        NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce because cannot prove result of CmpP/N.");)
         return false;
       }
-    } else if (use->is_CastPP()) {
-      if (!can_reduce_phi_check_users(use, nesting_level+1)) {
-        return false;
-      }
-    } else if (use->is_CheckCastPP()) {
+    } else if (use->is_CastPP() || use->is_CheckCastPP()) {
       if (!can_reduce_phi_check_users(use, nesting_level+1)) {
         return false;
       }
     } else {
-      NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce Phi %d on invocation %d. One of the uses is: %d %s", base->_idx, _invocation, use->_idx, use->Name());)
+      NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce because one of the uses is a %s", use->Name());)
       return false;
     }
   }

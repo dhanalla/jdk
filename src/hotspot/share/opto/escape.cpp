@@ -400,19 +400,18 @@ bool ConnectionGraph::compute_escape() {
   }
 
   // 6. Reduce allocation merges used as debug information. This is done after
-  // split_unique_types because the routines used to create
-  // SafePointScalarObjectNode need to traverse the memory graph to find values
-  // for object fields.
-  // We also set to null the scalarized entries of reducible Phis so that
-  // the object that they use can be later scalar replaced.
+  // split_unique_types because the methods used to create SafePointScalarObject
+  // need to traverse the memory graph to find values for object fields. We also
+  // set to null the scalarized entries of reducible Phis so that the object
+  // that they use can be later scalar replaced.
   if (ReduceAllocationMerges && reducible_merges.size() > 0) {
     bool delay = _igvn->delay_transform();
     _igvn->set_delay_transform(true);
     for (uint i = 0; i < reducible_merges.size(); i++ ) {
       Node* n = reducible_merges.at(i);
-
       if (n->outcnt() > 0) {
         if (!reduce_phi_on_safepoints(n->as_Phi())) {
+          NOT_PRODUCT(escape_state_statistics(java_objects_worklist);)
           C->record_failure(C2Compiler::retry_no_reduce_allocation_merges());
           return false;
         }
@@ -447,15 +446,12 @@ bool ConnectionGraph::compute_escape() {
   return has_non_escaping_obj;
 }
 
-// Check if it's profitable to reduce the Phi passed as parameter.  Returns true
-// if at least one scalar replaceable allocation participates in the merge and
-// no input to the Phi is nullable.
+// Check if it's profitable to reduce the Phi passed as parameter. Returns true
+// if at least one scalar replaceable allocation participates in the merge.
 bool ConnectionGraph::can_reduce_phi_check_inputs(PhiNode* ophi) const {
-  // Check if there is a scalar replaceable allocate in the Phi
   bool found_sr_allocate = false;
 
   for (uint i = 1; i < ophi->req(); i++) {
-    // We are looking for at least one SR object in the merge
     JavaObjectNode* ptn = unique_java_object(ophi->in(i));
     if (ptn != nullptr && ptn->scalar_replaceable()) {
       assert(ptn->ideal_node() != nullptr && ptn->ideal_node()->is_Allocate(), "sanity");
@@ -472,54 +468,6 @@ bool ConnectionGraph::can_reduce_phi_check_inputs(PhiNode* ophi) const {
 
   NOT_PRODUCT(if (TraceReduceAllocationMerges && !found_sr_allocate) tty->print_cr("Can NOT reduce Phi %d on invocation %d. No SR Allocate as input.", ophi->_idx, _invocation);)
   return found_sr_allocate;
-}
-
-bool ConnectionGraph::has_reducible_merge_base(Node* n, Unique_Node_List &reducible_merges) {
-  PointsToNode* ptn = ptnode_adr(n->_idx);
-  if (ptn == nullptr || !ptn->is_Field() || ptn->as_Field()->base_count() < 2) {
-    return false;
-  }
-
-  for (BaseIterator i(ptn->as_Field()); i.has_next(); i.next()) {
-    Node* base = i.get()->ideal_node();
-
-    if (reducible_merges.member(base)) {
-      return true;
-    }
-
-    if (base->is_CastPP() || base->is_CheckCastPP()) {
-      base = base->in(1);
-      if (reducible_merges.member(base)) {
-        return true;
-      }
-    }
-  }
-
-  return false;
-}
-
-// Checks if 'other' can point to the Allocate object pointed by 'sr_jobj'.
-// 'sr_jobj' is a scalar replaceable Object allocation, so we can leverage that
-// info to help decide the result of the comparison at compile time in some
-// cases.
-BoolTest::mask ConnectionGraph::static_cmpp_result(JavaObjectNode* sr_jobj, Node* other) const {
-  PointsToNode* other_ptn = ptnode_adr(other->_idx);
-  JavaObjectNode* other_jobj = unique_java_object(other);
-  Node* sr_node = sr_jobj->ideal_node();
-
-  if (other->is_Con()) {
-    return BoolTest::ne;
-  } else if (other_jobj == nullptr) {
-    return BoolTest::illegal;
-  } else if (sr_jobj == other_jobj) {
-    return BoolTest::eq;
-  } else if (sr_node != other_jobj->ideal_node()) {
-    return BoolTest::ne;
-  } else if (sr_jobj->meet(other_ptn)) {
-    return BoolTest::illegal;
-  } else {
-    return BoolTest::ne;
-  }
 }
 
 // Check if we are able to untangle the merge.
@@ -594,6 +542,54 @@ bool ConnectionGraph::can_reduce_phi_check_users(Node* base, int nesting_level) 
   return true;
 }
 
+bool ConnectionGraph::has_reducible_merge_base(Node* n, Unique_Node_List &reducible_merges) {
+  PointsToNode* ptn = ptnode_adr(n->_idx);
+  if (ptn == nullptr || !ptn->is_Field() || ptn->as_Field()->base_count() < 2) {
+    return false;
+  }
+
+  for (BaseIterator i(ptn->as_Field()); i.has_next(); i.next()) {
+    Node* base = i.get()->ideal_node();
+
+    if (reducible_merges.member(base)) {
+      return true;
+    }
+
+    if (base->is_CastPP() || base->is_CheckCastPP()) {
+      base = base->in(1);
+      if (reducible_merges.member(base)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+// Checks if 'other' can point to the Allocate object pointed by 'sr_jobj'.
+// 'sr_jobj' is a scalar replaceable Object allocation, so we can leverage that
+// info to help decide the result of the comparison at compile time in some
+// cases.
+BoolTest::mask ConnectionGraph::static_cmpp_result(JavaObjectNode* sr_jobj, Node* other) const {
+  PointsToNode* other_ptn = ptnode_adr(other->_idx);
+  JavaObjectNode* other_jobj = unique_java_object(other);
+  Node* sr_node = sr_jobj->ideal_node();
+
+  if (other->is_Con()) {
+    return BoolTest::ne;
+  } else if (other_jobj == nullptr) {
+    return BoolTest::illegal;
+  } else if (sr_jobj == other_jobj) {
+    return BoolTest::eq;
+  } else if (sr_node != other_jobj->ideal_node()) {
+    return BoolTest::ne;
+  } else if (sr_jobj->meet(other_ptn)) {
+    return BoolTest::illegal;
+  } else {
+    return BoolTest::ne;
+  }
+}
+
 // Returns true if: 1) It's profitable to reduce the merge, and 2) The Phi is
 // only used in some certain code shapes. Check comments in
 // 'can_reduce_phi_inputs' and 'can_reduce_phi_users' for more
@@ -607,10 +603,8 @@ bool ConnectionGraph::can_reduce_phi(PhiNode* ophi) const {
   }
 
   const Type* phi_t = _igvn->type(ophi);
-
-  if (phi_t == nullptr ||
-      phi_t->make_ptr() == nullptr ||
-      phi_t->make_ptr()->isa_instptr() == nullptr) {
+  if (phi_t == nullptr || phi_t->make_ptr() == nullptr ||
+                          phi_t->make_ptr()->isa_instptr() == nullptr) {
     return false;
   }
 
@@ -620,18 +614,6 @@ bool ConnectionGraph::can_reduce_phi(PhiNode* ophi) const {
 
   NOT_PRODUCT(if (TraceReduceAllocationMerges) { tty->print_cr("%s) Can reduce Phi %d during invocation %d: ", _compile->method()->name()->as_utf8(), ophi->_idx, _invocation); })
   return true;
-}
-
-void ConnectionGraph::collect_loads(Node* base, Unique_Node_List& loads) {
-  for (DUIterator_Fast imax, i = base->fast_outs(imax); i < imax; i++) {
-    Node* use = base->fast_out(i);
-    if (use->is_AddP()) {
-      for (DUIterator_Fast jmax, j = use->fast_outs(jmax); j < jmax; j++) {
-        Node* use_use = use->fast_out(j);
-        loads.push(use_use);
-      }
-    }
-  }
 }
 
 void ConnectionGraph::update_after_load_split(PhiNode* data_phi, AddPNode* previous_addp, LoadNode* previous_load,

@@ -1524,7 +1524,6 @@ static bool stable_phi(PhiNode* phi, PhaseGVN *phase) {
 // by 'split_through_phi'. The first use of this method was in EA code as part
 // of simplification of allocation merges.
 // Some differences from original method:
-//  - this method does not check for the presence of a Phi in the memory input.
 //  - If base->is_CastPP() or base->is_CheckCastPP(): base = base->in(1)
 bool LoadNode::can_split_through_phi_base(PhaseGVN* phase) {
   Node* mem        = in(Memory);

@@ -597,7 +597,6 @@ private:
   bool has_reducible_merge_base(Node* n, Unique_Node_List &reducible_merges);
   void if_on_selector(Node* current_control, Node* selector, Node** yes_sr_control, Node** not_sr_control, Node** selector_if_region);
   BoolTest::mask static_cmpp_result(JavaObjectNode* sr_jobj, Node* other) const;
-  void collect_loads(Node* base, Unique_Node_List& loads);
   void reset_merge_entries(PhiNode* ophi);
   PhiNode* create_selector(PhiNode* ophi) const;
   void update_after_load_split(PhiNode* data_phi, AddPNode* previous_addp, LoadNode* previous_load,

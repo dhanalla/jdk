@@ -138,7 +138,7 @@ class ObjectValue: public ScopeValue {
                                          // Otherwise false, meaning it's just a candidate
                                          // in an object allocation merge.
  public:
-  ObjectValue(int id, ScopeValue* klass, bool only_merge_candidate = false)
+  ObjectValue(int id, ScopeValue* klass)
      : _id(id)
      , _klass(klass)
      , _field_values()

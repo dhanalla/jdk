@@ -1310,7 +1310,7 @@ void PhaseCFG::schedule_late(VectorSet &visited, Node_Stack &stack) {
     // hoist_to_cheaper_block() will always have at least one valid choice.
     if (self->is_memory_writer()) {
       assert(find_block_for_node(self->in(0)) == early,
-            "The home of a memory writer must also be its earliest placement");
+             "The home of a memory writer must also be its earliest placement");
     }
 #endif
 

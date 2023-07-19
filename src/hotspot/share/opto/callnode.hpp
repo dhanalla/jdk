@@ -533,9 +533,6 @@ public:
   }
   uint n_fields()    const { return _n_fields; }
 
-  bool is_only_merge_candidate()           { return _only_merge_candidate; }
-  void set_only_merge_candidate(bool only) { _only_merge_candidate = only; }
-
 #ifdef ASSERT
   Node* alloc() const { return _alloc; }
 #endif

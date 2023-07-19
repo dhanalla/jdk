@@ -720,7 +720,7 @@ PhaseOutput::sv_for_node_id(GrowableArray<ScopeValue*> *objs, int id) {
 }
 
 void PhaseOutput::set_sv_for_object_node(GrowableArray<ScopeValue*> *objs,
-                                     ObjectValue* sv) {
+                                     ObjectValue* sv ) {
   assert(sv_for_node_id(objs, sv->id()) == nullptr, "Precondition");
   objs->append(sv);
 }
@@ -753,10 +753,9 @@ void PhaseOutput::FillLocArray( int idx, MachSafePointNode* sfpt, Node *local,
     if (sv == nullptr) {
       ciKlass* cik = t->is_oopptr()->exact_klass();
       assert(cik->is_instance_klass() ||
-            cik->is_array_klass(), "Not supported allocation.");
+             cik->is_array_klass(), "Not supported allocation.");
       sv = new ObjectValue(spobj->_idx,
-                           new ConstantOopWriteValue(cik->java_mirror()->constant_encoding()),
-                           spobj->is_only_merge_candidate());
+                           new ConstantOopWriteValue(cik->java_mirror()->constant_encoding()));
       set_sv_for_object_node(objs, sv);
 
       uint first_ind = spobj->first_index(sfpt->jvms());
@@ -765,7 +764,6 @@ void PhaseOutput::FillLocArray( int idx, MachSafePointNode* sfpt, Node *local,
         (void)FillLocArray(sv->field_values()->length(), sfpt, fld_node, sv->field_values(), objs);
       }
     }
-
     array->append(sv);
     return;
   } else if (local->is_SafePointScalarMerge()) {
@@ -1072,8 +1070,7 @@ void PhaseOutput::Process_OopMap_Node(MachNode *mach, int current_offset) {
           assert(cik->is_instance_klass() ||
                  cik->is_array_klass(), "Not supported allocation.");
           ObjectValue* sv = new ObjectValue(spobj->_idx,
-                                            new ConstantOopWriteValue(cik->java_mirror()->constant_encoding()),
-                                            spobj->is_only_merge_candidate());
+                                            new ConstantOopWriteValue(cik->java_mirror()->constant_encoding()));
           PhaseOutput::set_sv_for_object_node(objs, sv);
 
           uint first_ind = spobj->first_index(youngest_jvms);

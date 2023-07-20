@@ -682,22 +682,12 @@ void ConnectionGraph::reduce_phi_on_field_access(Node* previous_addp, GrowableAr
       alloc_worklist.remove_if_existing(previous_addp);
 }
 
-// This method will create a SafePointScalarObjectNode for each combination of
-// scalar replaceable allocation in 'ophi' and SafePoint node in 'safepoints'.
-// The method will create a SafePointScalarMERGEnode for each combination of
-// 'ophi' and SafePoint node in 'safepoints'.
-// Each SafePointScalarMergeNode created here may describe multiple scalar
-// replaced objects - check detailed description in SafePointScalarMergeNode
-// class header.
-//
-// This method will set entries in the Phi that are scalar replaceable to 'null'.
+// This method will call its helper method to reduce SafePoint nodes that use
+// 'ophi' or a casted version of 'ophi'.  All SafePoint nodes using the same
+// "version" of Phi use the same debug information (regarding the Phi).
+// Therefore, I collect all safepoints and patch them all at once.
 bool ConnectionGraph::reduce_phi_on_safepoints(PhiNode* ophi) {
-  // All SafePoint nodes using the same Phi node use the same debug
-  // information (regarding the Phi). Furthermore, reducing the Phi used by a
-  // SafePoint requires changing the Phi. Therefore, I collect all safepoints
-  // and patch them all at once later.
   Unique_Node_List safepoints;
-
   PhiNode* selector = create_selector(ophi);
 
   uint outcnt = ophi->outcnt();
@@ -724,26 +714,25 @@ bool ConnectionGraph::reduce_phi_on_safepoints(PhiNode* ophi) {
   return reduce_phi_on_safepoints_helper(ophi, nullptr, selector, safepoints);
 }
 
+// This method will create a SafePointScalarMERGEnode for each SafePoint in
+// 'safepoints'. It then will iterate on the inputs of 'ophi' and create a
+// SafePointScalarObjectNode for each scalar replaceable input. Each
+// SafePointScalarMergeNode may describe multiple scalar replaced objects -
+// check detailed description in SafePointScalarMergeNode class header.
 bool ConnectionGraph::reduce_phi_on_safepoints_helper(Node* ophi, Node* cast, Node* selector, Unique_Node_List& safepoints) {
-  if (safepoints.size() == 0) {
-    return true;
-  }
-
-  // Update the debug information of all safepoints in turn
   PhaseMacroExpand mexp(*_igvn);
   Node* original_sfpt_parent =  cast != nullptr ? cast : ophi;
   const TypeOopPtr* merge_t = _igvn->type(original_sfpt_parent)->make_oopptr();
 
-  Node* uncasted_sfpt_parent = ophi;
+  Node* nsr_merge_pointer = ophi;
   if (cast != nullptr && (cast->is_CastPP() || cast->is_CheckCastPP())) {
     const Type* new_t    = merge_t->meet(TypePtr::NULL_PTR);
     if (new_t == _igvn->type(cast->in(1))) {
-      uncasted_sfpt_parent = cast->in(1);
+      nsr_merge_pointer = cast->in(1);
     } else {
-      uncasted_sfpt_parent = cast->clone();
-      uncasted_sfpt_parent->as_ConstraintCast()->set_type(new_t);
-      //_igvn->set_type(uncasted_sfpt_parent, new_t);
-      _igvn->transform(uncasted_sfpt_parent);
+      nsr_merge_pointer = cast->clone();
+      nsr_merge_pointer->as_ConstraintCast()->set_type(new_t);
+      _igvn->transform(nsr_merge_pointer);
     }
   }
 
@@ -762,7 +751,7 @@ bool ConnectionGraph::reduce_phi_on_safepoints_helper(Node* ophi, Node* cast, No
     //  (2) A selector, used to decide if we need to rematerialize an object
     //      or use the pointer to a NSR object.
     // See more details of these fields in the declaration of SafePointScalarMergeNode
-    sfpt->add_req(uncasted_sfpt_parent);
+    sfpt->add_req(nsr_merge_pointer);
     sfpt->add_req(selector);
 
     for (uint i = 1; i < ophi->req(); i++) {
@@ -786,21 +775,19 @@ bool ConnectionGraph::reduce_phi_on_safepoints_helper(Node* ophi, Node* cast, No
       // Now make a pass over the debug information replacing any references
       // to the allocated object with "sobj"
       Node* ccpp = alloc->result_cast();
-      int debug_end = jvms->debug_end();
-      int reps = sfpt->replace_edges_in_range(ccpp, sobj, debug_start, debug_end, _igvn);
+      sfpt->replace_edges_in_range(ccpp, sobj, debug_start, jvms->debug_end(), _igvn);
 
       // Register the scalarized object as a candidate for reallocation
       smerge->add_req(sobj);
     }
 
     // Replaces debug information references to "sfpt_parent" in "sfpt" with references to "smerge"
-    int debug_end = jvms->debug_end();
-    sfpt->replace_edges_in_range(original_sfpt_parent, smerge, debug_start, debug_end, _igvn);
+    sfpt->replace_edges_in_range(original_sfpt_parent, smerge, debug_start, jvms->debug_end(), _igvn);
 
     // The call to 'replace_edges_in_range' above might have removed the
     // reference to ophi that we need at _merge_pointer_idx. The line below make
     // sure the reference is maintained.
-    sfpt->set_req(smerge->merge_pointer_idx(jvms), uncasted_sfpt_parent);
+    sfpt->set_req(smerge->merge_pointer_idx(jvms), nsr_merge_pointer);
     _igvn->_worklist.push(sfpt);
   }
 

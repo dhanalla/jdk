@@ -602,13 +602,13 @@ private:
   void update_after_load_split(PhiNode* data_phi, AddPNode* previous_addp, LoadNode* previous_load, GrowableArray<Node *>  &alloc_worklist, GrowableArray<Node *>  &memnode_worklist);
   Node* partial_load_split(Node* load, Node* ophi, Node* cast, Node* selector);
 
-  void reduce_phi(PhiNode* ophi, GrowableArray<Node *>  &alloc_worklist, GrowableArray<Node *>  &memnode_worklist);
   void reduce_on_cmp(PhiNode* ophi, Node* selector, Node* cmp);
   void reduce_cast_on_field_access(PhiNode* ophi, Node* selector, Node* castpp, GrowableArray<Node *>  &alloc_worklist, GrowableArray<Node *>  &memnode_worklist);
-  void reduce_phi_on_field_access(Node* previous_addp, GrowableArray<Node *>  &alloc_worklist);
 
   bool reduce_phi_on_safepoints_helper(Node* ophi, Node* cast, Node* selector, Unique_Node_List& safepoints);
+  void reduce_phi_on_field_access(Node* previous_addp, GrowableArray<Node *>  &alloc_worklist);
   bool reduce_phi_on_safepoints(PhiNode* ophi);
+  void reduce_phi(PhiNode* ophi, GrowableArray<Node *>  &alloc_worklist, GrowableArray<Node *>  &memnode_worklist);
 
   void set_not_scalar_replaceable(PointsToNode* ptn NOT_PRODUCT(COMMA const char* reason)) const {
 #ifndef PRODUCT

@@ -999,7 +999,7 @@ void ConnectionGraph::if_on_selector(Node* current_control, Node* selector, Node
   _igvn->_worklist.push(control_successor);
 }
 
-void ConnectionGraph::reduce_on_cast(PhiNode* ophi, Node* selector, Node* cast, GrowableArray<Node *>  &alloc_worklist, GrowableArray<Node *>  &memnode_worklist) {
+void ConnectionGraph::reduce_cast_on_field_access(PhiNode* ophi, Node* selector, Node* cast, GrowableArray<Node *>  &alloc_worklist, GrowableArray<Node *>  &memnode_worklist) {
   Unique_Node_List processed_addps;
   for (uint i = 0; i < cast->outcnt(); i++) {
     Node* use = cast->raw_out(i);
@@ -1150,7 +1150,7 @@ void ConnectionGraph::reduce_merge(PhiNode* ophi, GrowableArray<Node *>  &alloc_
   _igvn->set_delay_transform(true);
   _igvn->hash_delete(ophi);
 
-  reduce_phi_on_field_access(ophi, alloc_worklist, memnode_worklist);
+  reduce_phi_on_field_access(ophi, alloc_worklist);
 
   for (DUIterator_Fast imax, i = ophi->fast_outs(imax); i < imax; i++) {
     Node* use = ophi->fast_out(i);
@@ -1165,7 +1165,7 @@ void ConnectionGraph::reduce_merge(PhiNode* ophi, GrowableArray<Node *>  &alloc_
     } else if (use->is_Cmp()) {
       reduce_on_cmp(ophi, selector, use);
     } else if (use->is_CastPP() || use->is_CheckCastPP()) {
-      reduce_on_cast(ophi, selector, use, alloc_worklist, memnode_worklist);
+      reduce_cast_on_field_access(ophi, selector, use, alloc_worklist, memnode_worklist);
     }
   }
 

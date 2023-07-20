@@ -619,19 +619,13 @@ bool ConnectionGraph::can_reduce_phi(PhiNode* ophi) const {
   return true;
 }
 
-void ConnectionGraph::reduce_phi_on_field_access(PhiNode* ophi, GrowableArray<Node *>  &alloc_worklist) {
+void ConnectionGraph::reduce_phi_on_field_access(Node* previous_addp, GrowableArray<Node *>  &alloc_worklist) {
   // We'll pass this to 'split_through_phi' so that it'll do the split even
   // though the load doesn't have an unique instance type.
   bool ignore_missing_instance_id = true;
 
-  // Iterate over Phi outputs looking for an AddP
-  for (int j = ophi->outcnt()-1; j >= 0;) {
-    Node* previous_addp = ophi->raw_out(j);
-    uint num_edges = 1;
-    if (previous_addp->is_AddP()) {
       // All AddPs are present in the connection graph
       FieldNode* fn = ptnode_adr(previous_addp->_idx)->as_Field();
-      num_edges = previous_addp->in(AddPNode::Address) == previous_addp->in(AddPNode::Base) ? 2 : 1;
 
       // Iterate over AddP looking for a Load
       for (int k = previous_addp->outcnt()-1; k >= 0;) {
@@ -686,10 +680,6 @@ void ConnectionGraph::reduce_phi_on_field_access(PhiNode* ophi, GrowableArray<No
 
       // Remove the old AddP from the processing list because it's dead now
       alloc_worklist.remove_if_existing(previous_addp);
-    }
-    j -= num_edges;
-    j = MIN2(j, (int)ophi->outcnt()-1);
-  }
 }
 
 // This method will create a SafePointScalarObjectNode for each combination of
@@ -725,16 +715,16 @@ bool ConnectionGraph::reduce_phi_on_safepoints(PhiNode* ophi) {
         }
       }
 
-      if (!reduce_phi_on_sfpt(ophi, use, selector, child_sfpts)) {
+      if (!reduce_phi_on_safepoints_helper(ophi, use, selector, child_sfpts)) {
         return false;
       }
     }
   }
 
-  return reduce_phi_on_sfpt(ophi, nullptr, selector, safepoints);
+  return reduce_phi_on_safepoints_helper(ophi, nullptr, selector, safepoints);
 }
 
-bool ConnectionGraph::reduce_phi_on_sfpt(Node* ophi, Node* cast, Node* selector, Unique_Node_List& safepoints) {
+bool ConnectionGraph::reduce_phi_on_safepoints_helper(Node* ophi, Node* cast, Node* selector, Unique_Node_List& safepoints) {
   if (safepoints.size() == 0) {
     return true;
   }
@@ -980,7 +970,7 @@ void ConnectionGraph::reduce_on_cmp(PhiNode* ophi, Node* selector, Node* cmp) {
   _igvn->replace_node(cmp->raw_out(0), final_bol);
 }
 
-void ConnectionGraph::if_on_selector(Node* current_control, Node* selector, Node** yes_sr_control, Node** not_sr_control, Node** selector_if_region) {
+void ConnectionGraph::create_if_on_selector(Node* current_control, Node* selector, Node** yes_sr_control, Node** not_sr_control, Node** selector_if_region) {
   Node* control_successor = current_control->unique_ctrl_out();
   Node* minus_one         = _igvn->transform(ConINode::make(-1));
   Node* cmp               = _igvn->transform(new CmpINode(selector, minus_one));
@@ -1023,8 +1013,7 @@ void ConnectionGraph::reduce_cast_on_field_access(PhiNode* ophi, Node* selector,
           Node* yes_sr_control = nullptr;
           Node* not_sr_control = nullptr;
           Node* selector_if_region = nullptr;
-          if_on_selector(current_control, selector, &yes_sr_control, &not_sr_control, &selector_if_region);
-          //use_use->set_req(0, not_sr_control);
+          create_if_on_selector(current_control, selector, &yes_sr_control, &not_sr_control, &selector_if_region);
 
           Node* new_cast = _igvn->transform(cast->clone());
           new_cast->set_req(0, not_sr_control);
@@ -1076,10 +1065,6 @@ void ConnectionGraph::reduce_cast_on_field_access(PhiNode* ophi, Node* selector,
 
       processed_addps.push(use);
     }
-  }
-
-  for (uint i = 0; processed_addps.size(); i++) {
-
   }
 }
 
@@ -1141,17 +1126,16 @@ void ConnectionGraph::reset_merge_entries(PhiNode* ophi) {
   }
 }
 
-
-void ConnectionGraph::reduce_merge(PhiNode* ophi, GrowableArray<Node *>  &alloc_worklist, GrowableArray<Node *>  &memnode_worklist) {
+void ConnectionGraph::reduce_phi(PhiNode* ophi, GrowableArray<Node *>  &alloc_worklist, GrowableArray<Node *>  &memnode_worklist) {
   Unique_Node_List phi_users;
-  PhiNode* selector = create_selector(ophi);
+  PhiNode* selector = nullptr;
 
   bool delay = _igvn->delay_transform();
   _igvn->set_delay_transform(true);
   _igvn->hash_delete(ophi);
 
-  reduce_phi_on_field_access(ophi, alloc_worklist);
-
+  // Copying all users first because some will be removed and others won't.
+  // Ophi also may acquire some new users.
   for (DUIterator_Fast imax, i = ophi->fast_outs(imax); i < imax; i++) {
     Node* use = ophi->fast_out(i);
     phi_users.push(use);
@@ -1162,9 +1146,13 @@ void ConnectionGraph::reduce_merge(PhiNode* ophi, GrowableArray<Node *>  &alloc_
 
     if (use->is_SafePoint()) {
       // will be done later
+    } else if (use->is_AddP()) {
+      reduce_phi_on_field_access(use, alloc_worklist);
     } else if (use->is_Cmp()) {
+      selector = (selector == nullptr) ? create_selector(ophi) : selector;
       reduce_on_cmp(ophi, selector, use);
     } else if (use->is_CastPP() || use->is_CheckCastPP()) {
+      selector = (selector == nullptr) ? create_selector(ophi) : selector;
       reduce_cast_on_field_access(ophi, selector, use, alloc_worklist, memnode_worklist);
     }
   }
@@ -4231,7 +4219,7 @@ void ConnectionGraph::split_unique_types(GrowableArray<Node *>  &alloc_worklist,
       // finishes. For now we just try to split out the SR inputs of the merge.
       Node* parent = n->in(1);
       if (reducible_merges.member(n)) {
-        reduce_merge(n->as_Phi(), alloc_worklist, memnode_worklist);
+        reduce_phi(n->as_Phi(), alloc_worklist, memnode_worklist);
         continue;
       } else if (reducible_merges.member(parent)) {
         // 'n' is an user of a reducible merge (a Phi). It will be simplified as

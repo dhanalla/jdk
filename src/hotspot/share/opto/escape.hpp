@@ -595,21 +595,19 @@ private:
   bool can_reduce_phi_check_inputs(PhiNode* ophi) const;
 
   bool has_reducible_merge_base(AddPNode* n, Unique_Node_List &reducible_merges);
-  void if_on_selector(Node* current_control, Node* selector, Node** yes_sr_control, Node** not_sr_control, Node** selector_if_region);
   BoolTest::mask static_cmpp_result(JavaObjectNode* sr_jobj, Node* other) const;
   void reset_merge_entries(PhiNode* ophi);
+  void create_if_on_selector(Node* current_control, Node* selector, Node** yes_sr_control, Node** not_sr_control, Node** selector_if_region);
   PhiNode* create_selector(PhiNode* ophi) const;
-  void update_after_load_split(PhiNode* data_phi, AddPNode* previous_addp, LoadNode* previous_load,
-                               GrowableArray<Node *>  &alloc_worklist,
-                               GrowableArray<Node *>  &memnode_worklist);
+  void update_after_load_split(PhiNode* data_phi, AddPNode* previous_addp, LoadNode* previous_load, GrowableArray<Node *>  &alloc_worklist, GrowableArray<Node *>  &memnode_worklist);
   Node* partial_load_split(Node* load, Node* ophi, Node* cast, Node* selector);
 
-  void reduce_merge(PhiNode* ophi, GrowableArray<Node *>  &alloc_worklist, GrowableArray<Node *>  &memnode_worklist);
+  void reduce_phi(PhiNode* ophi, GrowableArray<Node *>  &alloc_worklist, GrowableArray<Node *>  &memnode_worklist);
   void reduce_on_cmp(PhiNode* ophi, Node* selector, Node* cmp);
   void reduce_cast_on_field_access(PhiNode* ophi, Node* selector, Node* castpp, GrowableArray<Node *>  &alloc_worklist, GrowableArray<Node *>  &memnode_worklist);
-  void reduce_phi_on_field_access(PhiNode* ophi, GrowableArray<Node *>  &alloc_worklist);
+  void reduce_phi_on_field_access(Node* previous_addp, GrowableArray<Node *>  &alloc_worklist);
 
-  bool reduce_phi_on_sfpt(Node* ophi, Node* cast, Node* selector, Unique_Node_List& safepoints);
+  bool reduce_phi_on_safepoints_helper(Node* ophi, Node* cast, Node* selector, Unique_Node_List& safepoints);
   bool reduce_phi_on_safepoints(PhiNode* ophi);
 
   void set_not_scalar_replaceable(PointsToNode* ptn NOT_PRODUCT(COMMA const char* reason)) const {

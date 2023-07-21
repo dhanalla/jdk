@@ -911,71 +911,6 @@ Node* ConnectionGraph::partial_load_split(Node* nsr_load, Node* ophi, Node* cast
   return _igvn->register_new_node_with_optimizer(phi);
 }
 
-void ConnectionGraph::reduce_on_cmp(PhiNode* ophi, Node* selector, Node* cmp) {
-  assert(cmp->outcnt() == 1, "sanity");
-
-  Node* other             = (cmp->in(1) == ophi) ? cmp->in(2) : cmp->in(1);
-  Node* cmp_bol_copy      = _igvn->transform(cmp->raw_out(0)->clone());
-  BoolTest curr_bool_op   = cmp_bol_copy->as_Bool()->_test;
-  Node* set_a             = _igvn->makecon(TypeInt::ZERO);
-  Node* set_b             = _igvn->makecon(TypeInt::ZERO);
-
-  for (uint i = 1; i < ophi->req(); i++) {
-    ConINode* sel_base_entry = selector->in(i)->as_ConI();
-
-    // We only care for the SR bases. The other ones will be taken care by the
-    // existing CmpP/N.
-    if (sel_base_entry->get_int() != -1) {
-      JavaObjectNode* sr_obj        = unique_java_object(ophi->in(i));
-      BoolTest::mask static_cmp_res = static_cmpp_result(sr_obj, other);
-      Node* was_this_path_taken_cmp = _igvn->transform(new CmpINode(selector, sel_base_entry));
-      Node* was_this_path_taken_bol = _igvn->transform(new BoolNode(was_this_path_taken_cmp, BoolTest::eq));
-      Node* as_int                  = was_this_path_taken_bol->as_Bool()->as_int_value(_igvn);
-
-      if (static_cmp_res == curr_bool_op._test) {
-        set_a = set_a->is_Con() ? as_int : _igvn->transform(new OrINode(set_a, as_int));
-      } else {
-        set_b = set_b->is_Con() ? as_int : _igvn->transform(new OrINode(set_b, as_int));
-      }
-    }
-  }
-
-  Node* right_side  = nullptr;
-  if (!set_b->is_Con()) {
-    Node* not_b_cmp   = _igvn->transform(new CmpINode(set_b, _igvn->makecon(TypeInt::ZERO)));
-    Node* not_b       = _igvn->transform(new BoolNode(not_b_cmp, BoolTest::eq));
-    Node* as_int      = not_b->as_Bool()->as_int_value(_igvn);
-    right_side  = _igvn->transform(new AndINode(as_int, cmp_bol_copy->as_Bool()->as_int_value(_igvn)));
-  } else {
-    right_side = cmp_bol_copy->as_Bool()->as_int_value(_igvn);
-  }
-
-  Node* final_merge = _igvn->transform(new OrINode(set_a, right_side));
-  Node* final_final = _igvn->transform(new CmpINode(final_merge, _igvn->makecon(TypeInt::ZERO)));
-  Node* final_bol   = _igvn->transform(new BoolNode(final_final, BoolTest::ne));
-
-  _igvn->replace_node(cmp->raw_out(0), final_bol);
-}
-
-void ConnectionGraph::create_if_on_selector(Node* current_control, Node* selector, Node** yes_sr_control, Node** not_sr_control, Node** selector_if_region) {
-  Node* control_successor = current_control->unique_ctrl_out();
-  Node* minus_one         = _igvn->transform(ConINode::make(-1));
-  Node* cmp               = _igvn->transform(new CmpINode(selector, minus_one));
-  Node* boll              = _igvn->transform(new BoolNode(cmp, BoolTest::ne));
-  IfNode* if_is_sr        = _igvn->transform(new IfNode(current_control, boll, PROB_MIN, COUNT_UNKNOWN))->as_If();
-  *yes_sr_control         = _igvn->transform(new IfTrueNode(if_is_sr));
-  *not_sr_control         = _igvn->transform(new IfFalseNode(if_is_sr));
-  *selector_if_region     = _igvn->transform(new RegionNode(3));
-
-  // Insert the new if-else-region block into the graph
-  (*selector_if_region)->set_req(1, *yes_sr_control);
-  (*selector_if_region)->set_req(2, *not_sr_control);
-  control_successor->replace_edge(current_control, *selector_if_region, _igvn);
-
-  _igvn->_worklist.push(current_control);
-  _igvn->_worklist.push(control_successor);
-}
-
 void ConnectionGraph::reduce_cast_on_field_access(PhiNode* ophi, Node* selector, Node* cast, GrowableArray<Node *>  &alloc_worklist, GrowableArray<Node *>  &memnode_worklist) {
   Unique_Node_List processed_addps;
   for (uint i = 0; i < cast->outcnt(); i++) {
@@ -1053,6 +988,71 @@ void ConnectionGraph::reduce_cast_on_field_access(PhiNode* ophi, Node* selector,
       processed_addps.push(use);
     }
   }
+}
+
+void ConnectionGraph::reduce_on_cmp(PhiNode* ophi, Node* selector, Node* cmp) {
+  assert(cmp->outcnt() == 1, "sanity");
+
+  Node* other             = (cmp->in(1) == ophi) ? cmp->in(2) : cmp->in(1);
+  Node* cmp_bol_copy      = _igvn->transform(cmp->raw_out(0)->clone());
+  BoolTest curr_bool_op   = cmp_bol_copy->as_Bool()->_test;
+  Node* set_a             = _igvn->makecon(TypeInt::ZERO);
+  Node* set_b             = _igvn->makecon(TypeInt::ZERO);
+
+  for (uint i = 1; i < ophi->req(); i++) {
+    ConINode* sel_base_entry = selector->in(i)->as_ConI();
+
+    // We only care for the SR bases. The other ones will be taken care by the
+    // existing CmpP/N.
+    if (sel_base_entry->get_int() != -1) {
+      JavaObjectNode* sr_obj        = unique_java_object(ophi->in(i));
+      BoolTest::mask static_cmp_res = static_cmpp_result(sr_obj, other);
+      Node* was_this_path_taken_cmp = _igvn->transform(new CmpINode(selector, sel_base_entry));
+      Node* was_this_path_taken_bol = _igvn->transform(new BoolNode(was_this_path_taken_cmp, BoolTest::eq));
+      Node* as_int                  = was_this_path_taken_bol->as_Bool()->as_int_value(_igvn);
+
+      if (static_cmp_res == curr_bool_op._test) {
+        set_a = set_a->is_Con() ? as_int : _igvn->transform(new OrINode(set_a, as_int));
+      } else {
+        set_b = set_b->is_Con() ? as_int : _igvn->transform(new OrINode(set_b, as_int));
+      }
+    }
+  }
+
+  Node* right_side  = nullptr;
+  if (!set_b->is_Con()) {
+    Node* not_b_cmp   = _igvn->transform(new CmpINode(set_b, _igvn->makecon(TypeInt::ZERO)));
+    Node* not_b       = _igvn->transform(new BoolNode(not_b_cmp, BoolTest::eq));
+    Node* as_int      = not_b->as_Bool()->as_int_value(_igvn);
+    right_side  = _igvn->transform(new AndINode(as_int, cmp_bol_copy->as_Bool()->as_int_value(_igvn)));
+  } else {
+    right_side = cmp_bol_copy->as_Bool()->as_int_value(_igvn);
+  }
+
+  Node* final_merge = _igvn->transform(new OrINode(set_a, right_side));
+  Node* final_final = _igvn->transform(new CmpINode(final_merge, _igvn->makecon(TypeInt::ZERO)));
+  Node* final_bol   = _igvn->transform(new BoolNode(final_final, BoolTest::ne));
+
+  _igvn->replace_node(cmp->raw_out(0), final_bol);
+}
+
+void ConnectionGraph::create_if_on_selector(Node* current_control, Node* selector, Node** yes_sr_control, Node** not_sr_control, Node** selector_if_region) {
+  Node* control_successor = current_control->unique_ctrl_out();
+  Node* minus_one         = _igvn->transform(ConINode::make(-1));
+  Node* cmp               = _igvn->transform(new CmpINode(selector, minus_one));
+  Node* boll              = _igvn->transform(new BoolNode(cmp, BoolTest::ne));
+  IfNode* if_is_sr        = _igvn->transform(new IfNode(current_control, boll, PROB_MIN, COUNT_UNKNOWN))->as_If();
+  *yes_sr_control         = _igvn->transform(new IfTrueNode(if_is_sr));
+  *not_sr_control         = _igvn->transform(new IfFalseNode(if_is_sr));
+  *selector_if_region     = _igvn->transform(new RegionNode(3));
+
+  // Insert the new if-else-region block into the graph
+  (*selector_if_region)->set_req(1, *yes_sr_control);
+  (*selector_if_region)->set_req(2, *not_sr_control);
+  control_successor->replace_edge(current_control, *selector_if_region, _igvn);
+
+  _igvn->_worklist.push(current_control);
+  _igvn->_worklist.push(control_successor);
 }
 
 // Create a 'selector' Phi based on the inputs of 'ophi'. If index 'i' of the

@@ -770,8 +770,6 @@ bool ConnectionGraph::reduce_phi_on_safepoints_helper(Node* ophi, Node* cast, No
         return false;
       }
 
-      jvms->set_endoff(sfpt->req());
-
       // Now make a pass over the debug information replacing any references
       // to the allocated object with "sobj"
       Node* ccpp = alloc->result_cast();
@@ -781,7 +779,7 @@ bool ConnectionGraph::reduce_phi_on_safepoints_helper(Node* ophi, Node* cast, No
       smerge->add_req(sobj);
     }
 
-    // Replaces debug information references to "sfpt_parent" in "sfpt" with references to "smerge"
+    // Replaces debug information references to "original_sfpt_parent" in "sfpt" with references to "smerge"
     sfpt->replace_edges_in_range(original_sfpt_parent, smerge, debug_start, jvms->debug_end(), _igvn);
 
     // The call to 'replace_edges_in_range' above might have removed the
@@ -990,6 +988,22 @@ void ConnectionGraph::reduce_cast_on_field_access(PhiNode* ophi, Node* selector,
   }
 }
 
+// This method transforms the `CmpP/N Ophi, X` into this equation: `A or (!B and C)`.
+// The A and B terms are constructed using only the inputs of Ophi that are
+// scalar replaceable.
+//    - 'A' and 'B' are logical expressions of the form `selector == a1 OR selector == a2 OR ... selector == aN`.
+//
+//    - 'A' is a expression that returns TRUE if, during the execution of the
+//      method, the activated input of 'Ophi' is one for which we were able to
+//      prove, at compile time, that it is equal to 'X'.
+//
+//    - 'B' is a expression that returns TRUE if, during the execution of the
+//      method, the activated input of 'Ophi' is one for which we were able to
+//      prove, at compile time, that it is NOT EQUAL to 'X'.
+//
+//    - 'C' is the result of `CmpP/N Ophi, X` but note that it will use a version
+//      of 'Ophi' where the scalar replaceable inputs are nullptr.
+//
 void ConnectionGraph::reduce_on_cmp(PhiNode* ophi, Node* selector, Node* cmp) {
   assert(cmp->outcnt() == 1, "sanity");
 
@@ -1000,14 +1014,14 @@ void ConnectionGraph::reduce_on_cmp(PhiNode* ophi, Node* selector, Node* cmp) {
   Node* set_b             = _igvn->makecon(TypeInt::ZERO);
 
   for (uint i = 1; i < ophi->req(); i++) {
-    ConINode* sel_base_entry = selector->in(i)->as_ConI();
+    ConINode* selector_base_id = selector->in(i)->as_ConI();
 
     // We only care for the SR bases. The other ones will be taken care by the
     // existing CmpP/N.
-    if (sel_base_entry->get_int() != -1) {
+    if (selector_base_id->get_int() != -1) {
       JavaObjectNode* sr_obj        = unique_java_object(ophi->in(i));
       BoolTest::mask static_cmp_res = static_cmpp_result(sr_obj, other);
-      Node* was_this_path_taken_cmp = _igvn->transform(new CmpINode(selector, sel_base_entry));
+      Node* was_this_path_taken_cmp = _igvn->transform(new CmpINode(selector, selector_base_id));
       Node* was_this_path_taken_bol = _igvn->transform(new BoolNode(was_this_path_taken_cmp, BoolTest::eq));
       Node* as_int                  = was_this_path_taken_bol->as_Bool()->as_int_value(_igvn);
 
@@ -1113,6 +1127,11 @@ void ConnectionGraph::reset_merge_entries(PhiNode* ophi) {
   }
 }
 
+// Reduce phi users that aren't related to debugging information:
+//   Field loads: will be reduced by calling 'split_through_phi'.
+//   CmpP/N: we'll resolve the comparison with scalar replaceable inputs
+//   statically so we can later remove them from the Phi.
+//   CastPP/CheckCastPP: only field loads are reduced here.
 void ConnectionGraph::reduce_phi(PhiNode* ophi, GrowableArray<Node *>  &alloc_worklist, GrowableArray<Node *>  &memnode_worklist) {
   Unique_Node_List phi_users;
   PhiNode* selector = nullptr;

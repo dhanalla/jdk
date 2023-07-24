@@ -861,6 +861,9 @@ void ConnectionGraph::update_after_load_split(PhiNode* data_phi, AddPNode* previ
   }
 }
 
+// This method will return a new PhiNode. The Phi inputs are clones of
+// 'nsr_load' for the SR inputs of 'ophi' and "Zero" for the NSR inputs of
+// 'ophi'.
 Node* ConnectionGraph::partial_load_split(Node* nsr_load, Node* ophi, Node* cast, Node* selector) {
   Node* address         = nsr_load->in(LoadNode::Address);
   Node* memory          = nsr_load->in(LoadNode::Memory);

@@ -89,7 +89,8 @@ public class AllocationMergesTests {
                  "testSRAndNSR_NoTrap_C2",
                  "testSRAndNSR_Trap_C2",
                  "testString_one_C2",
-                 "testString_two_C2"
+                 "testString_two_C2",
+				 "testNestedPhi_FieldLoad_C2",
                 })
     public void runner(RunInfo info) {
         Random random = info.getRandom();
@@ -145,6 +146,8 @@ public class AllocationMergesTests {
 
         Asserts.assertEQ(testSRAndNSR_Trap_Interp(false, cond1, cond2, x, y),
                          testSRAndNSR_Trap_C2(info.isTestC2Compiled("testSRAndNSR_Trap_C2"), cond1, cond2, x, y));
+		Asserts.assertEQ(testNestedPhi_FieldLoad_Interp(cond1, cond2, x, y),
+                         testNestedPhi_FieldLoad_C2(cond1, cond2, x, y));
 
         var arr1 = testNestedObjectsArray_Interp(cond1, x, y);
         var arr2 = testNestedObjectsArray_C2(cond1, x, y);
@@ -1251,6 +1254,32 @@ public class AllocationMergesTests {
 
     @DontCompile
     char testString_two_Interp(boolean cond1) { return testString_two(cond1); }
+
+    @ForceInline
+	int testNestedPhi_FieldLoad(boolean cond1, boolean cond2, int x, int y) {
+         Point p1 = new Point(x, y);
+         if (cond1) {
+            p1 = new Point(x+30, y+40);
+         }
+         Point p2 = p1;
+
+         if (cond2) {
+	  p2 = new Point(x+50, y+60);
+	 }
+         return  p2.x + p2.y;
+    }
+
+    @Test
+    @IR(counts = { IRNode.ALLOC, "3" }, phase = CompilePhase.PHASEIDEAL_BEFORE_EA)
+    @IR(counts = { IRNode.ALLOC, "0" }, phase = CompilePhase.ITER_GVN_AFTER_ELIMINATION)
+	int testNestedPhi_FieldLoad_C2(boolean cond1, boolean cond2, int x, int y) {
+		testNestedPhi_FieldLoad(cond1, cond2, x, y);
+	}
+
+	@DontCompile
+	int testNestedPhi_FieldLoad_Interp(boolean cond1, boolean cond2, int x, int y) {
+		testNestedPhi_FieldLoad(cond1, cond2, x, y);
+	}
 
     // ------------------ Utility for Testing ------------------- //
 

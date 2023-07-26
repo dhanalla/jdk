@@ -321,19 +321,6 @@ bool ConnectionGraph::compute_escape() {
   // an unique instance type.
   for (uint i = 0; i < reducible_merges.size(); i++ ) {
     Node* n = reducible_merges.at(i);
-    if (alloc_worklist.contains(n))
-     continue;
-    // make sure child phi will be processed before parent phi in a nested phi scenario
-    if (n->is_Phi()) {
-     for (uint j = 1; j < n->req(); j++) {
-       Node *parent = n->in(j);
-       if (parent->is_Phi() && reducible_merges.member(parent) && !alloc_worklist.contains(parent)) {
-        // list is processed in reverse order, add parent phi before child phi
-        alloc_worklist.append(parent);
-        tty->print_cr("***reorder nested phi nodes in worklist***");
-       }
-      }
-     }
     alloc_worklist.append(n);
   }
 
@@ -570,10 +557,17 @@ void ConnectionGraph::reduce_phi_on_field_access(PhiNode* ophi, GrowableArray<No
   // We'll pass this to 'split_through_phi' so that it'll do the split even
   // though the load doesn't have an unique instance type.
   bool ignore_missing_instance_id = true;
+  for (DUIterator_Fast imax, i = ophi->fast_outs(imax); i < imax; i++) {
+    Node* use = ophi->fast_out(i);
+    // make sure to process child phi nodes before parent phi nodes in nested phi scenario
+    if (use->is_Phi() && use->_idx != ophi->_idx && alloc_worklist.contains(use))  {
+     reduce_phi_on_field_access(use->as_Phi(), alloc_worklist);
+    }
+  }
 
   // Iterate over Phi outputs looking for an AddP
   for (int j = ophi->outcnt()-1; j >= 0;) {
-    Node* previous_addp = ophi->raw_out(j);
+	Node* previous_addp = ophi->raw_out(j);
     uint num_edges = 1;
     if (previous_addp->is_AddP()) {
       // All AddPs are present in the connection graph

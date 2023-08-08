@@ -590,9 +590,9 @@ private:
   // -------------------------------------------
   // Methods related to Reduce Allocation Merges
 
-  bool can_reduce_phi(PhiNode* ophi) const;
+  bool can_reduce_phi(PhiNode* ophi, Unique_Node_List& candidates) const;
   bool can_reduce_phi_check_users(Node* base, int nesting_level = 0) const;
-  bool can_reduce_phi_check_inputs(PhiNode* ophi) const;
+  bool can_reduce_phi_check_inputs(PhiNode* ophi, Unique_Node_List& candidates) const;
 
   bool has_reducible_merge_base(AddPNode* n, Unique_Node_List &reducible_merges);
   BoolTest::mask static_cmpp_result(JavaObjectNode* sr_jobj, Node* other) const;

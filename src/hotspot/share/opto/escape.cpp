@@ -460,62 +460,50 @@ bool ConnectionGraph::can_reduce_phi_check_inputs(PhiNode* ophi, Unique_Node_Lis
       } else {
         ptn->set_scalar_replaceable(false);
       }
-	} else if (ophi->in(i)->is_Phi()) {
-	    //return false; //disabling the nested for now
-      if (candidates.member(ophi->in(i)) || ophi->_idx == ophi->in(i)->_idx ) {
+   } else if (ophi->in(i)->is_Phi()) {
+      if (candidates.member(ophi->in(i)) || ophi->_idx == ophi->in(i)->_idx || can_reduce_phi_check_inputs(ophi->in(i)->as_Phi(), candidates)) {
 	  found_sr_allocate = true;
       }  
-     }								   
-    }
+   }								   
+  }
   NOT_PRODUCT(if (TraceReduceAllocationMerges && !found_sr_allocate) tty->print_cr("Can NOT reduce Phi %d on invocation %d. No SR Allocate as input.", ophi->_idx, _invocation);)
   return found_sr_allocate;
 }
 
-bool ConnectionGraph::can_reduce_field_load(Node *addp) const {
-  for (DUIterator_Fast imax, i = addp->fast_outs(imax); i < imax; i++) {
-    Node* use_use = addp->fast_out(i);
-    if (!use_use->is_Load() || !use_use->as_Load()->can_split_through_phi_base(_igvn)) {
-      return false;
-    }
-  }
-  return true;
-}									  
 // Check if we are able to untangle the merge. Right now we only reduce Phis
 // which are only used as debug information.
-bool ConnectionGraph::can_reduce_phi_check_users(PhiNode* ophi) const {
+bool ConnectionGraph::can_reduce_phi_check_users(PhiNode* ophi, int nestedDepth) const {
   for (DUIterator_Fast imax, i = ophi->fast_outs(imax); i < imax; i++) {
     Node* use = ophi->fast_out(i);
 
-    if (use->is_SafePoint()) {
+    if (use->is_SafePoint() && nestedDepth < 2) {
       if (use->is_Call() && use->as_Call()->has_non_debug_use(ophi)) {
         NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce Phi %d on invocation %d. Call has non_debug_use().", ophi->_idx, _invocation);)
         return false;
       }
-    } else if (use->is_AddP()) {
-      if (!can_reduce_field_load(use)) {
-		  return false;
-	  }
+    } else if (use->is_AddP() && nestedDepth <= 2) {
+      Node* addp = use;
+      for (DUIterator_Fast jmax, j = addp->fast_outs(jmax); j < jmax; j++) {
+        Node* use_use = addp->fast_out(j);
+        if (!use_use->is_Load() || !use_use->as_Load()->can_split_through_phi_base(_igvn)) {
+         NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce Phi %d on invocation %d. AddP user isn't a [splittable] Load(): %s", ophi->_idx, _invocation, use_use->Name());)
+         return false;
+        }
+      }
+    } else if (nestedDepth > 1) {
+      return false;
     } else if (use->is_Phi()) {
 	//    return false; //disabling nested phi opts
       if (ophi->_idx == use->_idx) {
 	tty->print_cr("***dump Loop nested phi***");
 //	ophi->dump(5);
       } else {
-	// Check for load field
-	for (DUIterator_Fast kmax, k = use->fast_outs(kmax); k < kmax; k++) {
-	  Node* use_use = use->fast_out(k);
-	  if (use_use->is_AddP()) {
-	   tty->print_cr("***dump nested phi load fields***");
-           //ophi->dump(4);
-	   //ophi->dump(-4);
-	   if (!can_reduce_field_load(use_use)) {
-	    NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce Phi %d on invocation %d. AddP user isn't a [splittable] Load(): %s", ophi->_idx, _invocation, use_use->Name());)
-	    return false;
-	   }
-	  } else {
- 	    return false;
-	  }
-        }
+	if (!can_reduce_phi_check_users(use->as_Phi(), nestedDepth+1)) {
+ 	 NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce nested Phi %d ", use->_idx);)
+	 return false;
+	} else {
+		tty->print_cr("Can reduce nested Phi %d ", use->_idx);
+	}
       }
     } else {
       NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce Phi %d on invocation %d. One of the uses is: %d %s", ophi->_idx, _invocation, use->_idx, use->Name());)
@@ -545,7 +533,7 @@ bool ConnectionGraph::can_reduce_phi(PhiNode* ophi, Unique_Node_List &candidates
     return false;
   }
 
-  if (!can_reduce_phi_check_inputs(ophi, candidates) || !can_reduce_phi_check_users(ophi)) {
+  if (!can_reduce_phi_check_inputs(ophi, candidates) || !can_reduce_phi_check_users(ophi, 1)) {
     return false;
   }
 
@@ -557,17 +545,27 @@ void ConnectionGraph::reduce_phi_on_field_access(PhiNode* ophi, GrowableArray<No
   // We'll pass this to 'split_through_phi' so that it'll do the split even
   // though the load doesn't have an unique instance type.
   bool ignore_missing_instance_id = true;
+  Unique_Node_List nested_phis;
+
+  if (ophi->outcnt() <= 0)
+   return;
+  // Collect nested phi nodes
   for (DUIterator_Fast imax, i = ophi->fast_outs(imax); i < imax; i++) {
     Node* use = ophi->fast_out(i);
-    // make sure to process child phi nodes before parent phi nodes in nested phi scenario
-    if (use->is_Phi() && use->_idx != ophi->_idx && alloc_worklist.contains(use))  {
-     reduce_phi_on_field_access(use->as_Phi(), alloc_worklist);
+    if (use->is_Phi() && use->_idx != ophi->_idx)  {
+     nested_phis.push(use);
     }
   }
-
+  // make sure to process child phi nodes before parent phi nodes in nested phi scenario
+  for (uint i=0; i<nested_phis.size(); i++) {
+    Node *nested_phi = nested_phis.at(i);	  
+    if (alloc_worklist.contains(nested_phi)) {
+     reduce_phi_on_field_access(nested_phi->as_Phi(), alloc_worklist);
+    }
+  }
   // Iterate over Phi outputs looking for an AddP
   for (int j = ophi->outcnt()-1; j >= 0;) {
-	Node* previous_addp = ophi->raw_out(j);
+    Node* previous_addp = ophi->raw_out(j);
     uint num_edges = 1;
     if (previous_addp->is_AddP()) {
       // All AddPs are present in the connection graph

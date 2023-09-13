@@ -485,24 +485,23 @@ bool ConnectionGraph::can_reduce_phi_check_users(PhiNode* ophi, int nestedDepth)
       Node* addp = use;
       for (DUIterator_Fast jmax, j = addp->fast_outs(jmax); j < jmax; j++) {
         Node* use_use = addp->fast_out(j);
-        if (!use_use->is_Load() || !use_use->as_Load()->can_split_through_phi_base(_igvn)) {
+        if (!use_use->is_Load() || !use_use->as_Load()->can_split_through_phi_base(_igvn, (nestedDepth > 1))) {
          NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce Phi %d on invocation %d. AddP user isn't a [splittable] Load(): %s", ophi->_idx, _invocation, use_use->Name());)
          return false;
         }
       }
     } else if (nestedDepth > 1) {
+      // Note: Do not change the position of this else as all below cases are not eligible for nested optimizations
       return false;
     } else if (use->is_Phi()) {
-	//    return false; //disabling nested phi opts
       if (ophi->_idx == use->_idx) {
-	tty->print_cr("***dump Loop nested phi***");
-//	ophi->dump(5);
+	tty->print_cr("***Can reduce self loop nested phi***");
       } else {
 	if (!can_reduce_phi_check_users(use->as_Phi(), nestedDepth+1)) {
  	 NOT_PRODUCT(if (TraceReduceAllocationMerges) tty->print_cr("Can NOT reduce nested Phi %d ", use->_idx);)
 	 return false;
 	} else {
-		tty->print_cr("Can reduce nested Phi %d ", use->_idx);
+	     tty->print_cr("Can reduce nested Phi %d ", use->_idx);
 	}
       }
     } else {
@@ -560,6 +559,7 @@ void ConnectionGraph::reduce_phi_on_field_access(PhiNode* ophi, GrowableArray<No
   for (uint i=0; i<nested_phis.size(); i++) {
     Node *nested_phi = nested_phis.at(i);	  
     if (alloc_worklist.contains(nested_phi)) {
+     tty->print_cr("Process child node before parent in nested phi");
      reduce_phi_on_field_access(nested_phi->as_Phi(), alloc_worklist);
     }
   }
